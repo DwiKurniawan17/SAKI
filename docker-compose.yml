@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  # ---- Laravel (app + web server) ----
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile   # Dockerfile Laravel standar (php-fpm + nginx / sail / octane, sesuaikan)
+    ports:
+      - "8000:80"
+    environment:
+      - CALC_API_URL=http://calc-api:8001
+      - CALC_API_KEY=${CALC_API_KEY}
+    depends_on:
+      - calc-api
+      - db
+    networks:
+      - simulasi-net
+
+  # ---- Python calculation microservice ----
+  calc-api:
+    build:
+      context: ./fastapi_service
+      dockerfile: Dockerfile
+    environment:
+      - APP_API_KEY=${CALC_API_KEY}
+    expose:
+      - "8001"
+    networks:
+      - simulasi-net
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=simulasi_aki
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - simulasi-net
+
+volumes:
+  db-data:
+
+networks:
+  simulasi-net:
+    driver: bridge

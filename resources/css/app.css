@@ -1,0 +1,39 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+/* ---- Telkom Indonesia Brand Theme ----
+ * Merah utama: #E4032E (identitas Telkom Indonesia)
+ * Putih: #FFFFFF (latar dominan korporat)
+ * Abu-abu: Slate palette (teks & elemen sekunder)
+ */
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+    /* Telkom Red Scale */
+    --color-telkom-50: #FEF2F2;
+    --color-telkom-100: #FEE2E2;
+    --color-telkom-200: #FECACA;
+    --color-telkom-300: #FCA5A5;
+    --color-telkom-400: #F87171;
+    --color-telkom-500: #E4032E;
+    --color-telkom-600: #CC0229;
+    --color-telkom-700: #B80224;
+    --color-telkom-800: #991B1B;
+    --color-telkom-900: #7F1D1D;
+
+    /* Telkom Gray (Slate-based) */
+    --color-telkom-gray-50: #F8FAFC;
+    --color-telkom-gray-100: #F1F5F9;
+    --color-telkom-gray-200: #E2E8F0;
+    --color-telkom-gray-300: #CBD5E1;
+    --color-telkom-gray-400: #94A3B8;
+    --color-telkom-gray-500: #64748B;
+    --color-telkom-gray-600: #475569;
+    --color-telkom-gray-700: #334155;
+    --color-telkom-gray-800: #1E293B;
+    --color-telkom-gray-900: #0F172A;
+}
