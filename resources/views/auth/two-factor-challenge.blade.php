@@ -1,40 +1,45 @@
 <x-layouts.guest title="Verifikasi 2FA">
-    <h2 class="text-lg font-bold text-telkom-gray-800 mb-1">Two-Factor Authentication</h2>
-    <p class="text-sm text-telkom-gray-500 mb-6">Masukkan kode 6 digit dari aplikasi authenticator Anda.</p>
+    <div class="mb-6">
+        <h2 class="text-xl font-bold text-slate-900 tracking-tight">Two-Factor Authentication</h2>
+        <p class="text-xs text-slate-500 mt-1">Masukkan 6 digit kode keamanan dari aplikasi authenticator Anda.</p>
+    </div>
 
     <div x-data="{ useRecovery: false }">
         {{-- OTP Code Form --}}
-        <form method="POST" action="{{ url('/two-factor-challenge') }}" x-show="!useRecovery" x-transition>
+        <form method="POST" action="{{ url('/two-factor-challenge') }}" x-show="!useRecovery" x-transition class="space-y-4">
             @csrf
-            <div class="space-y-4">
-                <div>
-                    <label for="code" class="block text-sm font-medium text-telkom-gray-700 mb-1">Kode OTP</label>
-                    <input id="code" type="text" name="code" autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="6"
-                           class="w-full rounded-xl border border-telkom-gray-300 px-4 py-3 text-sm text-center tracking-[0.5em] font-mono text-lg focus:ring-2 focus:ring-telkom-500 focus:border-telkom-500 outline-none">
-                </div>
-                <button type="submit" class="w-full bg-telkom-500 hover:bg-telkom-600 text-white font-semibold py-3.5 rounded-xl transition-all text-sm">
-                    Verifikasi
-                </button>
+            <div>
+                <label for="code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Kode OTP</label>
+                <input id="code" type="text" name="code" autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="6"
+                       placeholder="••••••"
+                       class="h-12 w-full rounded-lg border border-slate-300 px-4 text-center tracking-[0.5em] font-mono text-xl text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition-colors">
             </div>
+            <button type="submit" class="h-10 w-full inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold rounded-lg shadow-sm transition-all text-sm cursor-pointer">
+                <i data-lucide="check-shield" class="w-4 h-4"></i>
+                Verifikasi Kode
+            </button>
         </form>
 
         {{-- Recovery Code Form --}}
-        <form method="POST" action="{{ url('/two-factor-challenge') }}" x-show="useRecovery" x-transition>
+        <form method="POST" action="{{ url('/two-factor-challenge') }}" x-show="useRecovery" x-transition class="space-y-4">
             @csrf
-            <div class="space-y-4">
-                <div>
-                    <label for="recovery_code" class="block text-sm font-medium text-telkom-gray-700 mb-1">Recovery Code</label>
-                    <input id="recovery_code" type="text" name="recovery_code"
-                           class="w-full rounded-xl border border-telkom-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-telkom-500 focus:border-telkom-500 outline-none">
-                </div>
-                <button type="submit" class="w-full bg-telkom-500 hover:bg-telkom-600 text-white font-semibold py-3.5 rounded-xl transition-all text-sm">
-                    Verifikasi
-                </button>
+            <div>
+                <label for="recovery_code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Kode Pemulihan Darurat</label>
+                <input id="recovery_code" type="text" name="recovery_code"
+                       placeholder="xxxxx-xxxxx-xxxxx"
+                       class="h-10 w-full rounded-lg border border-slate-300 px-4 text-sm font-mono text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition-colors">
             </div>
+            <button type="submit" class="h-10 w-full inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold rounded-lg shadow-sm transition-all text-sm cursor-pointer">
+                <i data-lucide="key" class="w-4 h-4"></i>
+                Verifikasi Pemulihan
+            </button>
         </form>
 
-        <button @click="useRecovery = !useRecovery" class="w-full text-center text-sm text-telkom-500 hover:text-telkom-600 font-medium mt-4">
-            <span x-text="useRecovery ? 'Gunakan kode OTP' : 'Gunakan recovery code'"></span>
-        </button>
+        <div class="mt-6 pt-5 border-t border-slate-100 text-center">
+            <button @click="useRecovery = !useRecovery" class="text-xs text-red-600 hover:text-red-700 font-semibold hover:underline cursor-pointer">
+                <span x-text="useRecovery ? 'Gunakan kode OTP authenticator' : 'Gunakan kode pemulihan darurat (recovery code)'"></span>
+            </button>
+        </div>
     </div>
 </x-layouts.guest>
+

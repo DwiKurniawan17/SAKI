@@ -55,7 +55,8 @@ class RolePermissionSeeder extends Seeder
 
         // RSO (Admin) — review, approve/reject, cetak Excel, kelola user
         $admin = Role::firstOrCreate(['name' => 'admin']);
-        $admin->syncPermissions(Permission::all());
+        $adminPermissions = Permission::where('name', '!=', 'simulasi.create')->get();
+        $admin->syncPermissions($adminPermissions);
 
         // ---- Default Admin/RSO User ----
         $adminUser = User::firstOrCreate(

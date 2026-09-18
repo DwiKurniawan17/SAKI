@@ -20,6 +20,8 @@ class SimulasiAki extends Model
         'status',
         'nama_proyek',
         'lokasi',
+        'paketisasi',
+        'bandwidth',
         'input_json',
         'hasil_json',
         'npv',
@@ -46,6 +48,11 @@ class SimulasiAki extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::ensureColumnsExist();
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -57,6 +64,7 @@ class SimulasiAki extends Model
     // ---- Status constants ----
     const STATUS_DRAFT_PIHAK_B     = 'draft_pihak_b';
     const STATUS_MENUNGGU_PIHAK_A  = 'menunggu_pihak_a';
+    const STATUS_MENUNGGU_PIHAK_B  = 'menunggu_pihak_b';
     const STATUS_LENGKAP_TERHITUNG = 'lengkap_terhitung';
     const STATUS_MENUNGGU_REVIEW   = 'menunggu_review';
     const STATUS_APPROVED          = 'approved';
@@ -66,17 +74,46 @@ class SimulasiAki extends Model
     {
         return [
             self::STATUS_DRAFT_PIHAK_B     => 'Draft (Pihak B)',
-            self::STATUS_MENUNGGU_PIHAK_A  => 'Menunggu Pihak A',
+            self::STATUS_MENUNGGU_PIHAK_A  => 'Menunggu Engineer Development (ED)',
+            self::STATUS_MENUNGGU_PIHAK_B  => 'Menunggu Marketing',
             self::STATUS_LENGKAP_TERHITUNG => 'Lengkap & Terhitung',
             self::STATUS_MENUNGGU_REVIEW   => 'Menunggu Review RSO',
-            self::STATUS_APPROVED          => 'Disetujui RSO ✅',
-            self::STATUS_REVISI            => 'Perlu Revisi ⚠️',
+            self::STATUS_APPROVED          => 'Disetujui RSO',
+            self::STATUS_REVISI            => 'Perlu Revisi',
         ];
     }
 
     public function getStatusLabelAttribute(): string
     {
         return self::statusLabels()[$this->status] ?? $this->status;
+    }
+
+    public function getPaketisasiAttribute($value)
+    {
+        return $value ?? ($this->input_json['paketisasi'] ?? null);
+    }
+
+    public function getBandwidthAttribute($value)
+    {
+        return $value ?? ($this->input_json['bandwidth'] ?? null);
+    }
+
+    public static function ensureColumnsExist(): void
+    {
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('simulasi_aki')) {
+                \Illuminate\Support\Facades\Schema::table('simulasi_aki', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'paketisasi')) {
+                        $table->string('paketisasi')->nullable()->after('lokasi');
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'bandwidth')) {
+                        $table->string('bandwidth')->nullable()->after('paketisasi');
+                    }
+                });
+            }
+        } catch (\Throwable $e) {
+            // Ignore
+        }
     }
 
     // ---- Relationships ----
@@ -108,14 +145,22 @@ class SimulasiAki extends Model
         }
 
         if ($user->hasRole('sales_marketing')) {
-            return $query->where('user_id_pihak_b', $user->id);
+            // Marketing melihat: simulasi yang dia assigned sebagai pihak_b,
+            // simulasi yang menunggu mereka lengkapi, atau simulasi yang butuh revisi.
+            return $query->where(function ($q) use ($user) {
+                $q->where('user_id_pihak_b', $user->id)
+                  ->orWhere('status', self::STATUS_MENUNGGU_PIHAK_B)
+                  ->orWhere('status', self::STATUS_REVISI);
+            });
         }
 
         if ($user->hasRole('engineering_capex')) {
+            // ED melihat: simulasi yang dia buat (user_id_pihak_a)
+            // atau simulasi yang dia assigned sebagai pihak_b.
+            // STATUS_MENUNGGU_PIHAK_A dihapus — jalur lama sudah tidak aktif.
             return $query->where(function ($q) use ($user) {
                 $q->where('user_id_pihak_a', $user->id)
-                  ->orWhere('user_id_pihak_b', $user->id)
-                  ->orWhere('status', self::STATUS_MENUNGGU_PIHAK_A);
+                  ->orWhere('user_id_pihak_b', $user->id);
             });
         }
 

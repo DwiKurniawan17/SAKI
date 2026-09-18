@@ -3,7 +3,6 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileSecurityController;
-use App\Http\Controllers\RdmController;
 use App\Http\Controllers\SimulasiAkiController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +13,13 @@ Route::get('/', function () {
         : redirect('/login');
 });
 
+Route::get('/logout', function () {
+    auth()->logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect('/login');
+});
+
 // ---- Requires: authenticated + approved ----
 Route::middleware(['auth', 'approved'])->group(function () {
 
@@ -22,8 +28,9 @@ Route::middleware(['auth', 'approved'])->group(function () {
     // ---- Simulasi AKI ----
     Route::get('/simulasi/baru', [SimulasiAkiController::class, 'create'])->name('simulasi.create');
     Route::post('/simulasi/baru', [SimulasiAkiController::class, 'store'])->name('simulasi.store');
+    Route::post('/simulasi/import-excel', [SimulasiAkiController::class, 'storeExcel'])->name('simulasi.storeExcel');
     Route::get('/simulasi/{simulasi}', [SimulasiAkiController::class, 'show'])->name('simulasi.show');
-    Route::post('/simulasi/{simulasi}/complete', [SimulasiAkiController::class, 'completePihakA'])->name('simulasi.complete');
+    Route::post('/simulasi/{simulasi}/complete-marketing', [SimulasiAkiController::class, 'completePihakB'])->name('simulasi.completeMarketing');
     Route::get('/simulasi/{simulasi}/download', [SimulasiAkiController::class, 'download'])->name('simulasi.download');
     Route::delete('/simulasi/{simulasi}', [SimulasiAkiController::class, 'destroy'])->name('simulasi.destroy');
     Route::get('/riwayat', [SimulasiAkiController::class, 'riwayat'])->name('simulasi.riwayat');
@@ -36,6 +43,8 @@ Route::middleware(['auth', 'approved'])->group(function () {
     Route::middleware(['role:admin'])->group(function () {
         Route::post('/simulasi/{simulasi}/approve', [SimulasiAkiController::class, 'approve'])->name('simulasi.approve');
         Route::post('/simulasi/{simulasi}/reject', [SimulasiAkiController::class, 'reject'])->name('simulasi.reject');
+        Route::post('/simulasi/{simulasi}/recalculate', [SimulasiAkiController::class, 'recalculate'])->name('simulasi.recalculate');
+        Route::match(['get', 'post'], '/simulasi/{simulasi}/preview-excel', [SimulasiAkiController::class, 'previewExcel'])->name('simulasi.previewExcel');
     });
 
     // ---- Profile / Security ----
@@ -47,8 +56,6 @@ Route::middleware(['auth', 'approved'])->group(function () {
         Route::post('/users/{user}/approve', [AdminController::class, 'approve'])->name('users.approve');
         Route::post('/users/{user}/reject', [AdminController::class, 'reject'])->name('users.reject');
         Route::put('/users/{user}/role', [AdminController::class, 'updateRole'])->name('users.updateRole');
-        Route::get('/rdm', [RdmController::class, 'index'])->name('rdm');
-        Route::post('/rdm', [RdmController::class, 'update'])->name('rdm.update');
         Route::get('/audit-log', [AdminController::class, 'auditLog'])->name('audit-log');
     });
 });

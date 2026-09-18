@@ -80,4 +80,19 @@ class User extends Authenticatable
     {
         return ! is_null($this->two_factor_secret);
     }
+
+    /**
+     * Label human-readable untuk role user
+     */
+    public function getRoleDisplayNameAttribute(): string
+    {
+        $role = $this->getRoleNames()->first();
+        return match ($role) {
+            'engineering_capex' => 'Engineer Development',
+            'sales_marketing'   => 'Sales Marketing',
+            'admin'             => 'RSO (Admin)',
+            default             => $role ? ucwords(str_replace('_', ' ', $role)) : 'User',
+        };
+    }
 }
+

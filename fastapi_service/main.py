@@ -25,6 +25,8 @@ app = FastAPI(title="AKI/CAPEX Calculation Service", version="1.1.0")
 class SimulasiInput(BaseModel):
   nama_proyek: str = "Proyek Baru"
   lokasi: str = ""
+  paketisasi: str | None = None
+  bandwidth: str | None = None
   durasi_kontrak: int = Field(48, ge=1, le=120)
   bulan_tahun1: int = Field(6, ge=1, le=12)
   otc: float = 0
