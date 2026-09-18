@@ -20,7 +20,21 @@
                 <span class="text-slate-300">•</span>
                 <span class="text-xs text-slate-500 font-medium">Revisi Parameter Simulasi</span>
             </div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Revisi Simulasi: {{ $simulasi->nama_proyek }}</h1>
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Revisi Simulasi: {{ $simulasi->nama_proyek }}</h1>
+                @if($simulasi->pihakA)
+                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200" title="Diinput oleh Engineering Development (ED)">
+                    <i data-lucide="wrench" class="w-3.5 h-3.5 text-slate-500"></i>
+                    <span>Penginput (ED): <strong class="text-slate-900">{{ $simulasi->pihakA->name }}</strong></span>
+                </span>
+                @endif
+                @if($simulasi->pihakB)
+                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200" title="Dilengkapi oleh Marketing">
+                    <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>Pengisi Komersial (MKT): <strong class="text-blue-900">{{ $simulasi->pihakB->name }}</strong></span>
+                </span>
+                @endif
+            </div>
             <p class="text-sm text-slate-500 mt-1">Lakukan penyesuaian parameter proyek sesuai permintaan RSO, lalu kirim ulang untuk evaluasi ulang kelayakan.</p>
         </div>
 
@@ -42,7 +56,21 @@
             @if($isMarketing && !$isAdmin)
                 <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2 text-xs">
                     <span class="font-bold text-slate-700 block uppercase tracking-wider text-[11px]">Parameter Proyek & CAPEX (Dari Engineer Development)</span>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                    <div class="grid grid-cols-2 sm:grid-cols-6 gap-3 pt-1">
+                        <div>
+                            <span class="text-slate-500 block text-[11px]">Penginput (ED)</span>
+                            <span class="font-semibold text-slate-900 inline-flex items-center gap-1 mt-0.5">
+                                <i data-lucide="wrench" class="w-3.5 h-3.5 text-slate-500"></i>
+                                <span>{{ $simulasi->pihakA?->name ?? '-' }}</span>
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block text-[11px]">Pengisi Komersial (MKT)</span>
+                            <span class="font-semibold text-slate-900 inline-flex items-center gap-1 mt-0.5">
+                                <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-500"></i>
+                                <span>{{ $simulasi->pihakB?->name ?? 'Belum Diisi' }}</span>
+                            </span>
+                        </div>
                         <div>
                             <span class="text-slate-500 block text-[11px]">Nama Proyek</span>
                             <span class="font-semibold text-slate-900">{{ $simulasi->nama_proyek }}</span>

@@ -132,6 +132,30 @@ class SimulasiAki extends Model
         return $this->belongsTo(User::class, 'reviewed_by');
     }
 
+    /**
+     * User Engineering Development (ED) yang menginput proyek & estimasi CAPEX (pemula simulasi).
+     */
+    public function getPenginputEdAttribute(): ?User
+    {
+        return $this->pihakA ?? ($this->status === self::STATUS_MENUNGGU_PIHAK_A ? null : $this->pihakB);
+    }
+
+    /**
+     * User Marketing yang mengisi / mengupdate parameter komersial (OTC, MRC, Paketisasi, Bandwidth).
+     */
+    public function getPengisiMarketingAttribute(): ?User
+    {
+        return $this->pihakB;
+    }
+
+    /**
+     * Alias user penginput utama (ED).
+     */
+    public function getPenginputAttribute(): ?User
+    {
+        return $this->penginputEd;
+    }
+
     public function revisiLogs()
     {
         return $this->hasMany(RevisiLog::class, 'simulasi_id')->latest();

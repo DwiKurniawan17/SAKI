@@ -73,10 +73,8 @@ class SimulasiAkiController extends Controller
             'rdm_mrc_pct'    => $rdm->rdm_mrc_pct,
         ];
 
-        $defaultMarketing = \App\Models\User::role('sales_marketing')->first();
-
         $simulasi = SimulasiAki::create([
-            'user_id_pihak_b' => $defaultMarketing ? $defaultMarketing->id : $user->id,
+            'user_id_pihak_b' => null, // Menunggu input dari Marketing
             'user_id_pihak_a' => $user->id,
             'nama_proyek'     => $validated['nama_proyek'],
             'lokasi'          => $validated['lokasi'] ?? null,
@@ -87,7 +85,7 @@ class SimulasiAkiController extends Controller
         activity('simulasi')
             ->causedBy($user)
             ->performedOn($simulasi)
-            ->log('Engineering membuat simulasi baru (menunggu input tarif & paketisasi dari Marketing)');
+            ->log("Engineering ({$user->name}) membuat simulasi baru (menunggu input tarif & paketisasi dari Marketing)");
 
         return redirect()->route('simulasi.show', $simulasi)
             ->with('status', 'Data proyek & CAPEX berhasil disimpan! Menunggu divisi Marketing mengisi tarif OTC, MRC, dan paketisasi.');
@@ -248,7 +246,6 @@ class SimulasiAkiController extends Controller
         }
 
         // Semua valid — buat simulasi per baris lokasi
-        $defaultMarketing = \App\Models\User::role('sales_marketing')->first();
         $createdCount = 0;
         $firstSimulasi = null;
 
@@ -281,7 +278,7 @@ class SimulasiAkiController extends Controller
             ];
 
             $simulasi = SimulasiAki::create([
-                'user_id_pihak_b' => $defaultMarketing ? $defaultMarketing->id : $user->id,
+                'user_id_pihak_b' => null, // Menunggu input dari Marketing
                 'user_id_pihak_a' => $user->id,
                 'nama_proyek'     => $namaProyek,
                 'lokasi'          => $lokasiStr,
@@ -416,7 +413,7 @@ class SimulasiAkiController extends Controller
         activity('simulasi')
             ->causedBy($user)
             ->performedOn($simulasi)
-            ->log('Marketing melengkapi data komersial (OTC, MRC, Paketisasi, Bandwidth)');
+            ->log("Marketing ({$user->name}) melengkapi data komersial (OTC, MRC, Paketisasi, Bandwidth)");
 
         return $this->calculateAndSave($simulasi, $fullInput, $user);
     }
@@ -437,6 +434,7 @@ class SimulasiAkiController extends Controller
     public function show(Request $request, SimulasiAki $simulasi)
     {
         $this->authorizeAccess($simulasi, $request->user());
+        $simulasi->loadMissing(['pihakA', 'pihakB', 'reviewer']);
 
         return view('simulasi.show', [
             'simulasi' => $simulasi,
@@ -448,7 +446,7 @@ class SimulasiAkiController extends Controller
     public function riwayat(Request $request)
     {
         $user = $request->user();
-        $query = SimulasiAki::forUser($user);
+        $query = SimulasiAki::forUser($user)->with(['pihakA', 'pihakB']);
 
         if ($request->filled('q')) {
             $query->where('nama_proyek', 'like', '%' . $request->input('q') . '%');
@@ -816,8 +814,13 @@ class SimulasiAkiController extends Controller
                 'tax_pct'        => $rdm->tax_pct,
                 'wacc_pct'       => $rdm->wacc_pct,
             ]);
-            $simulasi->paketisasi = $validated['paketisasi'];
-            $simulasi->bandwidth  = $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null);
+            $simulasi->user_id_pihak_b = $user->id; // Rekam user marketing yang mengupdate revisi
+            $simulasi->paketisasi      = $validated['paketisasi'];
+            $simulasi->bandwidth       = $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null);
+            activity('simulasi')
+                ->causedBy($user)
+                ->performedOn($simulasi)
+                ->log("Marketing ({$user->name}) memperbarui data revisi komersial");
         } else {
             $fullInput = $this->validateAllFields($request);
             if (!empty($fullInput['paketisasi'])) {

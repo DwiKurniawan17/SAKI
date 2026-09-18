@@ -78,6 +78,29 @@
                 </div>
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{{ $simulasi->nama_proyek }}</h1>
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 mt-2">
+                    {{-- ED (Penginput Proyek & CAPEX) --}}
+                    @if($simulasi->pihakA)
+                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200" title="Diinput oleh Engineering Development (ED)">
+                        <i data-lucide="wrench" class="w-3.5 h-3.5 text-slate-500"></i>
+                        <span>Penginput (ED): <strong class="text-slate-900">{{ $simulasi->pihakA->name }}</strong>@if(auth()->id() === $simulasi->pihakA->id) <span class="text-slate-400 font-normal text-[11px]">(Anda)</span>@endif</span>
+                    </span>
+                    <span class="text-slate-300">•</span>
+                    @endif
+
+                    {{-- Marketing (Pengisi / Pengupdate Komersial) --}}
+                    @if($simulasi->pihakB)
+                    <span class="inline-flex items-center gap-1.5 font-medium text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200" title="Parameter komersial dilengkapi oleh Divisi Marketing">
+                        <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-600"></i>
+                        <span>Diupdate Komersial (MKT): <strong class="text-blue-900">{{ $simulasi->pihakB->name }}</strong>@if(auth()->id() === $simulasi->pihakB->id) <span class="text-blue-400 font-normal text-[11px]">(Anda)</span>@endif</span>
+                    </span>
+                    <span class="text-slate-300">•</span>
+                    @elseif($simulasi->status === \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B)
+                    <span class="inline-flex items-center gap-1.5 font-medium text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200" title="Menunggu Divisi Marketing melengkapi tarif komersial">
+                        <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i>
+                        <span>Menunggu Input Komersial Marketing</span>
+                    </span>
+                    <span class="text-slate-300">•</span>
+                    @endif
                     <span class="inline-flex items-center gap-1.5">
                         <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>
                         <span>Lokasi: <strong>{{ $simulasi->lokasi ?? '-' }}</strong></span>
@@ -272,8 +295,22 @@
 
             {{-- Ringkasan Input User --}}
             <div class="bg-slate-50 rounded-lg border border-slate-200 p-4 space-y-2 text-xs">
-                <span class="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">Data dari Engineer Development & Marketing</span>
+                <span class="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">Data Kolaborasi Antar Divisi (ED & Marketing)</span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+                    <div>
+                        <span class="text-slate-500 block text-[11px]">Penginput CAPEX (ED)</span>
+                        <span class="font-semibold text-slate-900 inline-flex items-center gap-1 mt-0.5">
+                            <i data-lucide="wrench" class="w-3.5 h-3.5 text-slate-500"></i>
+                            <span>{{ $simulasi->pihakA?->name ?? '-' }}</span>
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block text-[11px]">Pengisi Komersial (MKT)</span>
+                        <span class="font-semibold text-slate-900 inline-flex items-center gap-1 mt-0.5">
+                            <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-500"></i>
+                            <span>{{ $simulasi->pihakB?->name ?? 'Belum Diisi' }}</span>
+                        </span>
+                    </div>
                     <div><span class="text-slate-500 block text-[11px]">Nama Proyek</span><span class="font-semibold text-slate-900">{{ $simulasi->nama_proyek }}</span></div>
                     <div><span class="text-slate-500 block text-[11px]">Lokasi</span><span class="font-semibold text-slate-900">{{ $simulasi->lokasi ?? '-' }}</span></div>
                     <div><span class="text-slate-500 block text-[11px]">Paketisasi</span><span class="font-semibold text-slate-900">{{ $simulasi->paketisasi ?? '-' }}</span></div>
@@ -715,7 +752,7 @@
                     </div>
                     <h2 class="text-base font-bold text-slate-900">Lengkapi Parameter Komersial Proyek</h2>
                     <p class="text-xs text-slate-500 mt-1">
-                        Divisi Engineer Development telah memasukkan data estimasi biaya CAPEX. Silakan tentukan skema paketisasi, bandwidth, tarif OTC, dan tarif MRC.
+                        Divisi Engineer Development (<strong>{{ $simulasi->pihakA?->name ?? 'ED' }}</strong>) telah memasukkan data estimasi biaya CAPEX. Silakan tentukan skema paketisasi, bandwidth, tarif OTC, dan tarif MRC.
                     </p>
                 </div>
 

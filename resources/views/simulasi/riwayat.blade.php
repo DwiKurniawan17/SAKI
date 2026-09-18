@@ -25,7 +25,15 @@
                 </div>
                 <select name="status" class="h-10 rounded-lg border border-slate-300 px-3 text-xs text-slate-700 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white min-w-[200px]">
                     <option value="">Semua Status</option>
-                    @foreach(\App\Models\SimulasiAki::statusLabels() as $key => $label)
+                    @php
+                        $filterStatuses = [
+                            \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B  => 'Menunggu Marketing',
+                            \App\Models\SimulasiAki::STATUS_MENUNGGU_REVIEW   => 'Menunggu Review RSO',
+                            \App\Models\SimulasiAki::STATUS_REVISI             => 'Perlu Revisi',
+                            \App\Models\SimulasiAki::STATUS_APPROVED           => 'Disetujui',
+                        ];
+                    @endphp
+                    @foreach($filterStatuses as $key => $label)
                         <option value="{{ $key }}" {{ request('status') === $key ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                 </select>
@@ -62,7 +70,37 @@
                                         <a href="{{ route('simulasi.show', $item) }}" class="font-semibold text-slate-900 hover:text-red-600 transition-colors">
                                             {{ $item->nama_proyek }}
                                         </a>
-                                        <div class="flex items-center gap-2 flex-wrap mt-0.5">
+                                        <div class="flex items-center gap-2 flex-wrap mt-1">
+                                            {{-- ED (Penginput Proyek & CAPEX) --}}
+                                            @if($item->pihakA)
+                                            <span class="inline-flex items-center gap-1 text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="Diinput oleh Engineering (ED): {{ $item->pihakA->name }}">
+                                                <i data-lucide="wrench" class="w-3 h-3 text-slate-500"></i>
+                                                <span class="text-slate-500 text-[10px] font-semibold">ED:</span>
+                                                <span class="font-medium">{{ $item->pihakA->name }}</span>
+                                                @if(auth()->id() === $item->pihakA->id)
+                                                <span class="text-[10px] text-slate-400 font-normal">(Anda)</span>
+                                                @endif
+                                            </span>
+                                            @endif
+
+                                            {{-- Marketing (Pengisi / Pengupdate Komersial OTC, MRC) --}}
+                                            @if($item->pihakB)
+                                            <span class="inline-flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200" title="Dilengkapi / Diupdate oleh Marketing: {{ $item->pihakB->name }}">
+                                                <i data-lucide="tag" class="w-3 h-3 text-blue-500"></i>
+                                                <span class="text-blue-500 text-[10px] font-semibold">MKT:</span>
+                                                <span class="font-medium">{{ $item->pihakB->name }}</span>
+                                                @if(auth()->id() === $item->pihakB->id)
+                                                <span class="text-[10px] text-blue-400 font-normal">(Anda)</span>
+                                                @endif
+                                            </span>
+                                            @elseif($item->status === \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B)
+                                            <span class="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80" title="Menunggu Divisi Marketing mengisi tarif OTC, MRC & paketisasi">
+                                                <i data-lucide="clock" class="w-3 h-3 text-amber-500"></i>
+                                                <span>Menunggu Marketing</span>
+                                            </span>
+                                            @endif
+
+                                            <span class="text-slate-300">•</span>
                                             @if($item->lokasi)
                                             <span class="inline-flex items-center gap-1 text-[11px] text-slate-500">
                                                 <i data-lucide="map-pin" class="w-3 h-3 text-slate-400"></i>

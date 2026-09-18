@@ -6,7 +6,7 @@
                 <h1 class="text-xl font-bold text-slate-900 tracking-tight">Selamat Datang, {{ $user->name }}</h1>
                 <p class="text-xs text-slate-500 mt-0.5">Sistem Evaluasi & Simulasi Kelayakan Investasi AKI / CAPEX — PT Telkom Indonesia</p>
             </div>
-            @if($user->hasAnyRole(['sales_marketing', 'engineering_capex']))
+            @if($user->hasRole('engineering_capex'))
             <a href="{{ route('simulasi.create') }}" class="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-all shadow-xs shrink-0">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
                 <span>Buat Simulasi Baru</span>
@@ -239,7 +239,37 @@
                                     </div>
                                     <div>
                                         <div class="flex items-center gap-2 flex-wrap">
-                                            <span class="font-semibold text-slate-900">{{ $item->nama_proyek }}</span>
+                                            <a href="{{ route('simulasi.show', $item) }}" class="font-semibold text-slate-900 hover:text-red-600 transition-colors">
+                                                {{ $item->nama_proyek }}
+                                            </a>
+                                            {{-- ED (Penginput Proyek) --}}
+                                            @if($item->pihakA)
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200" title="Diinput oleh Engineering (ED): {{ $item->pihakA->name }}">
+                                                <i data-lucide="wrench" class="w-2.5 h-2.5 text-slate-500"></i>
+                                                <span class="text-slate-500 text-[9px] font-bold">ED:</span>
+                                                {{ $item->pihakA->name }}
+                                                @if(auth()->id() === $item->pihakA->id)
+                                                <span class="text-[9px] text-slate-400 font-normal">(Anda)</span>
+                                                @endif
+                                            </span>
+                                            @endif
+
+                                            {{-- Marketing (Pengisi Komersial) --}}
+                                            @if($item->pihakB)
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200" title="Dilengkapi / Diupdate oleh Marketing: {{ $item->pihakB->name }}">
+                                                <i data-lucide="tag" class="w-2.5 h-2.5 text-blue-500"></i>
+                                                <span class="text-blue-500 text-[9px] font-bold">MKT:</span>
+                                                {{ $item->pihakB->name }}
+                                                @if(auth()->id() === $item->pihakB->id)
+                                                <span class="text-[9px] text-blue-400 font-normal">(Anda)</span>
+                                                @endif
+                                            </span>
+                                            @elseif($item->status === \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B)
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Menunggu Divisi Marketing mengisi tarif komersial">
+                                                <i data-lucide="clock" class="w-2.5 h-2.5 text-amber-500"></i>
+                                                <span>Menunggu Marketing</span>
+                                            </span>
+                                            @endif
                                             @if($item->lokasi)
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700">
                                                 <i data-lucide="map-pin" class="w-2.5 h-2.5 text-slate-400"></i>
