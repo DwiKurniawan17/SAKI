@@ -36,6 +36,7 @@ return [
     ],
 
     'calc_api' => [
+        // FastAPI calculation microservice (port 8001)
         'url' => env('CALC_API_URL', 'http://127.0.0.1:8001'),
         'key' => env('CALC_API_KEY', ''),
     ],

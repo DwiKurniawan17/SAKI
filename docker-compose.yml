@@ -17,7 +17,7 @@ services:
     networks:
       - simulasi-net
 
-  # ---- Python calculation microservice ----
+  # ---- FastAPI calculation microservice ----
   calc-api:
     build:
       context: ./fastapi_service
@@ -26,6 +26,8 @@ services:
       - APP_API_KEY=${CALC_API_KEY}
     expose:
       - "8001"
+    ports:
+      - "8001:8001"
     networks:
       - simulasi-net
 

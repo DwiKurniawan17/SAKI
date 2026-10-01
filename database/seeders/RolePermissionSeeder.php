@@ -58,19 +58,43 @@ class RolePermissionSeeder extends Seeder
         $adminPermissions = Permission::where('name', '!=', 'simulasi.create')->get();
         $admin->syncPermissions($adminPermissions);
 
-        // ---- Default Admin/RSO User ----
-        $adminUser = User::firstOrCreate(
+        // ---- 1. Default Admin / RSO User ----
+        $adminUser = User::updateOrCreate(
             ['email' => 'admin@telkom.co.id'],
             [
                 'name'              => 'RSO Administrator',
-                'password'          => Hash::make('Admin@12345!'),
+                'password'          => Hash::make('password'),
                 'is_approved'       => true,
                 'email_verified_at' => now(),
             ]
         );
-        $adminUser->assignRole('admin');
+        $adminUser->syncRoles(['admin']);
 
-        $this->command->info('Roles, permissions, dan RSO admin user berhasil dibuat.');
-        $this->command->info('Login RSO: admin@telkom.co.id / Admin@12345!');
+        // ---- 2. Default Engineer Development (ED) User ----
+        $edUser = User::updateOrCreate(
+            ['email' => 'ed@telkom.co.id'],
+            [
+                'name'              => 'Engineer Development (ED)',
+                'password'          => Hash::make('password'),
+                'is_approved'       => true,
+                'email_verified_at' => now(),
+            ]
+        );
+        $edUser->syncRoles(['engineering_capex']);
+
+        // ---- 3. Default Sales Marketing User ----
+        $marketingUser = User::updateOrCreate(
+            ['email' => 'marketing@telkom.co.id'],
+            [
+                'name'              => 'Sales Marketing',
+                'password'          => Hash::make('password'),
+                'is_approved'       => true,
+                'email_verified_at' => now(),
+            ]
+        );
+        $marketingUser->syncRoles(['sales_marketing']);
+
+        $this->command->info('Roles, permissions, dan user demo (Admin, ED, Marketing) berhasil disiapkan.');
+        $this->command->info('Password seluruh user demo: password');
     }
 }

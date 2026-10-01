@@ -19,33 +19,134 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+        [x-cloak] { display: none !important; }
+
+        /* Sidebar Smooth Collapse & Fullscreen Transition */
+        #app-sidebar {
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-in-out !important;
+            will-change: margin-left, transform;
+        }
+
+        /* Desktop View (>= 1024px) */
+        @media (min-width: 1024px) {
+            #app-sidebar {
+                position: static !important;
+                transform: none !important;
+                margin-left: 0 !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+            html.sidebar-closed #app-sidebar,
+            body.sidebar-closed #app-sidebar {
+                margin-left: -16rem !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            #mobile-sidebar-backdrop {
+                display: none !important;
+            }
+        }
+
+        /* Mobile View (< 1024px) */
+        @media (max-width: 1023px) {
+            #app-sidebar {
+                position: fixed !important;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                z-index: 50;
+                transform: translateX(-100%) !important;
+                margin-left: 0 !important;
+                width: 16rem !important;
+            }
+            html.sidebar-open #app-sidebar,
+            body.sidebar-open #app-sidebar {
+                transform: translateX(0) !important;
+            }
+            #mobile-sidebar-backdrop {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background-color: rgba(15, 23, 42, 0.5);
+                z-index: 40;
+                backdrop-filter: blur(2px);
+                transition: opacity 0.2s ease-in-out;
+            }
+            html.sidebar-open #mobile-sidebar-backdrop,
+            body.sidebar-open #mobile-sidebar-backdrop {
+                display: block !important;
+            }
+        }
+    </style>
+
+    <script>
+        // Apply saved desktop preference immediately to prevent UI flash
+        (function() {
+            try {
+                if (window.innerWidth >= 1024 && localStorage.getItem('sidebar_desktop_closed') === 'true') {
+                    document.documentElement.classList.add('sidebar-closed');
+                }
+            } catch (e) {}
+        })();
+
+        function toggleAppSidebar() {
+            const isDesktop = window.innerWidth >= 1024;
+            if (isDesktop) {
+                const isClosed = document.documentElement.classList.toggle('sidebar-closed');
+                document.body.classList.toggle('sidebar-closed', isClosed);
+                try {
+                    localStorage.setItem('sidebar_desktop_closed', isClosed ? 'true' : 'false');
+                } catch (e) {}
+            } else {
+                const isOpen = document.documentElement.classList.toggle('sidebar-open');
+                document.body.classList.toggle('sidebar-open', isOpen);
+            }
+        }
+
+        function closeMobileSidebar() {
+            document.documentElement.classList.remove('sidebar-open');
+            document.body.classList.remove('sidebar-open');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                if (window.innerWidth >= 1024 && localStorage.getItem('sidebar_desktop_closed') === 'true') {
+                    document.body.classList.add('sidebar-closed');
+                }
+            } catch (e) {}
+        });
+    </script>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800 antialiased" x-data="{ sidebarOpen: window.innerWidth >= 1024 }" @resize.window="sidebarOpen = window.innerWidth >= 1024">
+<body class="bg-slate-50 font-sans text-slate-800 antialiased">
 
 <div class="flex h-screen overflow-hidden relative">
 
     {{-- Mobile Overlay --}}
-    <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-slate-900/50 z-40 lg:hidden" x-transition.opacity x-cloak></div>
+    <div id="mobile-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
     {{-- ===== SIDEBAR ===== --}}
     @auth
-    <aside class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-red-600 via-red-700 to-red-800 text-white flex flex-col transition-transform duration-300 lg:static lg:translate-x-0 border-r border-red-800/80 select-none shrink-0"
-           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+    <aside id="app-sidebar" class="w-64 bg-gradient-to-b from-red-600 via-red-700 to-red-800 text-white flex flex-col border-r border-red-800/80 select-none shrink-0">
 
         {{-- Brand / Logo --}}
         <div class="p-4 border-b border-red-800/80">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 group">
-                <div class="w-8 h-8 bg-white text-red-600 rounded-lg flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                    <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
-                <div class="flex flex-col leading-none">
-                    <span class="text-white text-sm font-black tracking-tight">Telkom<span class="text-red-200">Indonesia</span></span>
-                    <span class="text-red-100 text-[10px] font-semibold tracking-wider uppercase mt-0.5">AKI / CAPEX Engine</span>
-                </div>
-            </a>
+            <div class="flex items-center justify-between">
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 group">
+                    <div class="w-8 h-8 bg-white text-red-600 rounded-lg flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                        <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <div class="flex flex-col leading-none">
+                        <span class="text-white text-sm font-black tracking-tight">Telkom<span class="text-red-200">Indonesia</span></span>
+                        <span class="text-red-100 text-[10px] font-semibold tracking-wider uppercase mt-0.5">AKI / CAPEX Engine</span>
+                    </div>
+                </a>
+                <button type="button" onclick="closeMobileSidebar()" class="lg:hidden text-red-200 hover:text-white p-1 rounded-lg transition-colors cursor-pointer" title="Tutup Menu">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
 
             {{-- User Card --}}
             <a href="{{ route('profile.security') }}" class="mt-3 block bg-red-800/80 hover:bg-red-800 border border-red-500/50 rounded-lg p-2.5 transition-colors">
@@ -119,6 +220,14 @@
                 <span>Kelola Pengguna</span>
             </a>
 
+            {{-- Katalog Price List --}}
+            @php $active = request()->routeIs('admin.price-list*'); @endphp
+            <a href="{{ route('admin.price-list') }}"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $active ? 'bg-white text-red-700 font-bold shadow-xs' : 'text-red-100 hover:text-white hover:bg-red-800/60' }}">
+                <i data-lucide="tag" class="w-4 h-4 shrink-0"></i>
+                <span>Katalog Price List</span>
+            </a>
+
             {{-- Audit Log --}}
             @php $active = request()->routeIs('admin.audit-log'); @endphp
             <a href="{{ route('admin.audit-log') }}"
@@ -155,7 +264,11 @@
         @auth
         <header class="bg-white border-b border-slate-200 h-14 flex items-center justify-between px-6 shrink-0">
             <div class="flex items-center gap-3">
-                <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-slate-700 p-1 rounded-lg transition-colors cursor-pointer" title="Toggle Sidebar">
+                <button type="button"
+                        id="btn-sidebar-toggle"
+                        onclick="toggleAppSidebar()"
+                        class="text-slate-600 hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/20 active:scale-95"
+                        title="Sembunyikan / Tampilkan Menu (Full Screen)">
                     <i data-lucide="menu" class="w-5 h-5"></i>
                 </button>
                 <div class="hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium">

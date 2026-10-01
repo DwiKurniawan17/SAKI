@@ -106,8 +106,8 @@
                         {{-- Khusus ED: Lokasi --}}
                         @if(auth()->user()->hasRole('engineering_capex'))
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Proyek</label>
-                            <input type="text" name="lokasi" value="{{ old('lokasi') }}" placeholder="Contoh: Witel Jakarta Barat"
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Proyek <span class="text-red-500">*</span></label>
+                            <input type="text" name="lokasi" value="{{ old('lokasi') }}" required placeholder="Contoh: Witel Jakarta Barat"
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 placeholder-slate-400 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                         </div>
                         @endif
@@ -124,18 +124,18 @@
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Biaya Material (Rp) <span class="text-red-500">*</span></label>
                             <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'material')" x-on:focus="selectAll($event)" x-on:blur="handleBlur($event, 'material')"
-                                   x-bind:value="display.material" required
+                                   x-bind:value="display.material" required placeholder="0"
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             <input type="hidden" name="material" x-bind:value="raw.material">
-                            <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.material)"></p>
+                            <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="raw.material !== '' ? 'Rp ' + formatRp(raw.material) : 'Rp 0'"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Biaya Jasa (Rp) <span class="text-red-500">*</span></label>
                             <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'jasa')" x-on:focus="selectAll($event)" x-on:blur="handleBlur($event, 'jasa')"
-                                   x-bind:value="display.jasa" required
+                                   x-bind:value="display.jasa" required placeholder="0"
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             <input type="hidden" name="jasa" x-bind:value="raw.jasa">
-                            <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.jasa)"></p>
+                            <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="raw.jasa !== '' ? 'Rp ' + formatRp(raw.jasa) : 'Rp 0'"></p>
                         </div>
                     </div>
 
@@ -198,7 +198,7 @@
                              @drop.prevent="handleDrop($event)"
                              @click="$refs.fileInput.click()">
                             <input type="file" name="excel_file" accept=".xlsx,.xls" required
-                                   x-ref="fileInput" class="hidden"
+                                   x-ref="fileInput" class="sr-only"
                                    @change="handleFileSelect($event)">
                             <template x-if="!fileName">
                                 <div class="space-y-2.5">
@@ -348,17 +348,17 @@
         const rdmMrcPct = {{ $rdm->rdm_mrc_pct }};
 
         const initRaw = {
-            otc: {{ old('otc', 0) }},
-            mrc: {{ old('mrc', 0) }},
-            material: {{ old('material', 0) }},
-            jasa: {{ old('jasa', 0) }},
+            otc: {!! json_encode(old('otc', '')) !!},
+            mrc: {!! json_encode(old('mrc', '')) !!},
+            material: {!! json_encode(old('material', '')) !!},
+            jasa: {!! json_encode(old('jasa', '')) !!},
         };
 
         return {
             activeTab: 'manual',
             raw: { ...initRaw },
             display: Object.fromEntries(
-                Object.entries(initRaw).map(([k, v]) => [k, v === 0 ? '0' : Number(v).toLocaleString('id-ID')])
+                Object.entries(initRaw).map(([k, v]) => [k, (v === '' || v === null) ? '' : Number(v).toLocaleString('id-ID')])
             ),
 
             get cogsOtc() {
@@ -375,9 +375,14 @@
 
             handleCurrency(event, field) {
                 let digits = event.target.value.replace(/\D/g, '');
-                let num = parseInt(digits, 10) || 0;
-                this.raw[field] = num;
-                this.display[field] = digits === '' ? '' : num.toLocaleString('id-ID');
+                if (digits === '') {
+                    this.raw[field] = '';
+                    this.display[field] = '';
+                } else {
+                    let num = parseInt(digits, 10) || 0;
+                    this.raw[field] = num;
+                    this.display[field] = num.toLocaleString('id-ID');
+                }
 
                 this.$nextTick(() => {
                     event.target.value = this.display[field];
@@ -386,8 +391,9 @@
 
             handleBlur(event, field) {
                 if (!this.display[field] || this.display[field] === '') {
-                    this.display[field] = '0';
-                    event.target.value = '0';
+                    this.display[field] = '';
+                    this.raw[field] = '';
+                    event.target.value = '';
                 }
             },
 

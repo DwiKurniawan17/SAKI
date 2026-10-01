@@ -9,8 +9,8 @@
         <form method="POST" action="{{ url('/two-factor-challenge') }}" x-show="!useRecovery" x-transition class="space-y-4">
             @csrf
             <div>
-                <label for="code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Kode OTP</label>
-                <input id="code" type="text" name="code" autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="6"
+                <label for="code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Kode OTP <span class="text-red-500">*</span></label>
+                <input id="code" type="text" name="code" required autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="6"
                        placeholder="••••••"
                        class="h-12 w-full rounded-lg border border-slate-300 px-4 text-center tracking-[0.5em] font-mono text-xl text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition-colors">
             </div>
@@ -24,8 +24,8 @@
         <form method="POST" action="{{ url('/two-factor-challenge') }}" x-show="useRecovery" x-transition class="space-y-4">
             @csrf
             <div>
-                <label for="recovery_code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Kode Pemulihan Darurat</label>
-                <input id="recovery_code" type="text" name="recovery_code"
+                <label for="recovery_code" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Kode Pemulihan Darurat <span class="text-red-500">*</span></label>
+                <input id="recovery_code" type="text" name="recovery_code" required
                        placeholder="xxxxx-xxxxx-xxxxx"
                        class="h-10 w-full rounded-lg border border-slate-300 px-4 text-sm font-mono text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition-colors">
             </div>

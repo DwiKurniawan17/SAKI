@@ -48,7 +48,7 @@
         </div>
         @endif
 
-        <form method="POST" action="{{ route('simulasi.update', $simulasi) }}" class="bg-white rounded-xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-7">
+        <form method="POST" action="{{ route('simulasi.update', $simulasi) }}" x-on:change="lookupPrice()" class="bg-white rounded-xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-7">
             @csrf
             @method('PUT')
 
@@ -96,39 +96,28 @@
                         <span class="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">1</span>
                         <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Parameter Komersial (Marketing)</h2>
                     </div>
-                    {{-- Paketisasi & Bandwidth --}}
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Paketisasi Layanan <span class="text-red-500">*</span></label>
-                            <input type="text" name="paketisasi" list="paketisasi-options" value="{{ old('paketisasi', $simulasi->paketisasi ?? $inp['paketisasi'] ?? '') }}" required
-                                   placeholder="Pilih atau ketik skema paket"
-                                   class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
-                            <datalist id="paketisasi-options">
-                                <option value="Paket Connectivity Only">
-                                <option value="Paket Bundling Managed Service">
-                                <option value="Paket Enterprise Silver">
-                                <option value="Paket Enterprise Gold">
-                                <option value="Paket Enterprise Platinum">
-                                <option value="Paket Custom Solusi">
-                            </datalist>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Bandwidth / Kapasitas Layanan <span class="text-red-500">*</span></label>
-                            <input type="text" name="bandwidth" list="bandwidth-options" value="{{ old('bandwidth', $simulasi->bandwidth ?? $inp['bandwidth'] ?? '') }}" required
-                                   placeholder="Contoh: 100 Mbps, 1 Gbps, 500 Mbps"
-                                   class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
-                            <datalist id="bandwidth-options">
-                                <option value="10 Mbps">
-                                <option value="20 Mbps">
-                                <option value="50 Mbps">
-                                <option value="100 Mbps">
-                                <option value="200 Mbps">
-                                <option value="500 Mbps">
-                                <option value="1 Gbps">
-                                <option value="2 Gbps">
-                                <option value="10 Gbps">
-                            </datalist>
-                        </div>
+                    {{-- Paketisasi & Bandwidth (dinamis) --}}
+                    <x-produk-selector
+                        prefix="mkt"
+                        :kategori="old('kategori', $simulasi->kategori ?? $inp['kategori'] ?? '')"
+                        :paketisasi="old('paketisasi', $simulasi->paketisasi ?? $inp['paketisasi'] ?? '')"
+                        :bandwidth="old('bandwidth', $simulasi->bandwidth ?? $inp['bandwidth'] ?? '')"
+                    />
+
+                    {{-- Wilayah Zonasi Tarif Telkom --}}
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Wilayah / Zona Tarif Telkom
+                        </label>
+                        <select name="wilayah" x-model="wilayah" x-on:change="lookupPrice('mkt')"
+                                class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
+                            <option value="">-- Pilih Wilayah (Otomatis jika kosong) --</option>
+                            <option value="Jabodetabek" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Jabodetabek' || str_contains(strtolower($simulasi->lokasi ?? ''), 'jakarta') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bogor') || str_contains(strtolower($simulasi->lokasi ?? ''), 'depok') || str_contains(strtolower($simulasi->lokasi ?? ''), 'tangerang') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bekasi')) ? 'selected' : '' }}>Jabodetabek</option>
+                            <option value="Jawa" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Jawa' || str_contains(strtolower($simulasi->lokasi ?? ''), 'jawa') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bandung') || str_contains(strtolower($simulasi->lokasi ?? ''), 'surabaya') || str_contains(strtolower($simulasi->lokasi ?? ''), 'semarang')) ? 'selected' : '' }}>Jawa</option>
+                            <option value="Sumatera" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Sumatera' || str_contains(strtolower($simulasi->lokasi ?? ''), 'sumatera') || str_contains(strtolower($simulasi->lokasi ?? ''), 'medan') || str_contains(strtolower($simulasi->lokasi ?? ''), 'palembang')) ? 'selected' : '' }}>Sumatera</option>
+                            <option value="Kalimantan / KTI" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Kalimantan / KTI' || str_contains(strtolower($simulasi->lokasi ?? ''), 'kalimantan') || str_contains(strtolower($simulasi->lokasi ?? ''), 'sulawesi') || str_contains(strtolower($simulasi->lokasi ?? ''), 'papua') || str_contains(strtolower($simulasi->lokasi ?? ''), 'makassar') || str_contains(strtolower($simulasi->lokasi ?? ''), 'balikpapan')) ? 'selected' : '' }}>Kalimantan / KTI</option>
+                        </select>
+                        <p class="text-[11px] text-slate-400 mt-1">Wilayah acuan pencocokan tarif katalog (Lokasi proyek: {{ $simulasi->lokasi ?? '-' }}).</p>
                     </div>
 
                     {{-- Durasi Kontrak & Bulan di Tahun 1 --}}
@@ -162,8 +151,60 @@
                                    x-bind:value="display.mrc" required
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             <input type="hidden" name="mrc" x-bind:value="raw.mrc">
+                            <input type="hidden" name="tarif_normal_mrc" x-bind:value="tarifNormal">
                             <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.mrc)"></p>
                         </div>
+                    </div>
+
+                    {{-- Widget Informasi Diskon Realtime --}}
+                    <div x-show="tarifNormal > 0" x-transition class="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 space-y-3 shadow-xs">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-600 font-semibold flex items-center gap-1.5">
+                                <i data-lucide="tag" class="w-4 h-4 text-red-600"></i>
+                                <span>Tarif Resmi Katalog (Price List):</span>
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono font-bold text-slate-900 text-sm" x-text="'Rp ' + formatRp(tarifNormal) + ' /bln'"></span>
+                                <button type="button" x-show="raw.mrc !== tarifNormal" @click="applyCatalogPrice()" class="text-[11px] text-red-600 hover:text-red-700 font-semibold inline-flex items-center gap-1 hover:underline cursor-pointer">
+                                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                                    <span>Gunakan Tarif Katalog</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <template x-if="diskonNominal > 0">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <i data-lucide="percent" class="w-3.5 h-3.5"></i>
+                                        <span x-text="'Diskon ' + diskonPct + '% (Potongan Rp ' + formatRp(diskonNominal) + ')'"></span>
+                                    </span>
+                                </template>
+                                <template x-if="diskonNominal === 0">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                        <span>Tarif Normal (Tanpa Diskon)</span>
+                                    </span>
+                                </template>
+                                <template x-if="diskonNominal < 0">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                                        <span x-text="'Markup +' + Math.abs(diskonPct) + '% (+Rp ' + formatRp(Math.abs(diskonNominal)) + ')'"></span>
+                                    </span>
+                                </template>
+                            </div>
+
+                            <template x-if="diskonNominal > 0">
+                                <span class="text-xs font-medium" :class="isProfitDeficit ? 'text-rose-600 font-bold' : 'text-amber-800'">
+                                    <span x-text="profitKeterangan"></span>
+                                </span>
+                            </template>
+                        </div>
+
+                        <template x-if="isProfitDeficit">
+                            <div class="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium flex items-center gap-2">
+                                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 shrink-0"></i>
+                                <span>Peringatan: Diskon memotong seluruh target profit 30%. Harga penawaran berada di bawah modal estimasi COGS (Rp <span x-text="formatRp(cogsStandar)"></span>).</span>
+                            </div>
+                        </template>
                     </div>
                 </div>
             @endif
@@ -205,8 +246,8 @@
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Proyek</label>
-                            <input type="text" name="lokasi" value="{{ old('lokasi', $inp['lokasi'] ?? $simulasi->lokasi) }}"
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Proyek <span class="text-red-500">*</span></label>
+                            <input type="text" name="lokasi" value="{{ old('lokasi', $inp['lokasi'] ?? $simulasi->lokasi) }}" required
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                         </div>
                     </div>
@@ -255,8 +296,8 @@
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Proyek</label>
-                            <input type="text" name="lokasi" value="{{ old('lokasi', $inp['lokasi'] ?? $simulasi->lokasi) }}"
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lokasi Proyek <span class="text-red-500">*</span></label>
+                            <input type="text" name="lokasi" value="{{ old('lokasi', $inp['lokasi'] ?? $simulasi->lokasi) }}" required
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                         </div>
                     </div>
@@ -279,39 +320,29 @@
                         <span class="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">2</span>
                         <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Parameter Komersial (Marketing)</h2>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Paketisasi Layanan</label>
-                            <input type="text" name="paketisasi" list="paketisasi-options-admin" value="{{ old('paketisasi', $simulasi->paketisasi ?? $inp['paketisasi'] ?? '') }}"
-                                   placeholder="Pilih atau ketik paket"
-                                   class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
-                            <datalist id="paketisasi-options-admin">
-                                <option value="Paket Connectivity Only">
-                                <option value="Paket Bundling Managed Service">
-                                <option value="Paket Enterprise Silver">
-                                <option value="Paket Enterprise Gold">
-                                <option value="Paket Enterprise Platinum">
-                                <option value="Paket Custom Solusi">
-                            </datalist>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Bandwidth / Kapasitas Layanan</label>
-                            <input type="text" name="bandwidth" list="bandwidth-options-admin" value="{{ old('bandwidth', $simulasi->bandwidth ?? $inp['bandwidth'] ?? '') }}"
-                                   placeholder="Contoh: 100 Mbps, 1 Gbps, 500 Mbps"
-                                   class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
-                            <datalist id="bandwidth-options-admin">
-                                <option value="10 Mbps">
-                                <option value="20 Mbps">
-                                <option value="50 Mbps">
-                                <option value="100 Mbps">
-                                <option value="200 Mbps">
-                                <option value="500 Mbps">
-                                <option value="1 Gbps">
-                                <option value="2 Gbps">
-                                <option value="10 Gbps">
-                            </datalist>
-                        </div>
+                    {{-- Paketisasi & Bandwidth (dinamis) --}}
+                    <x-produk-selector
+                        prefix="admin"
+                        :kategori="old('kategori', $simulasi->kategori ?? $inp['kategori'] ?? '')"
+                        :paketisasi="old('paketisasi', $simulasi->paketisasi ?? $inp['paketisasi'] ?? '')"
+                        :bandwidth="old('bandwidth', $simulasi->bandwidth ?? $inp['bandwidth'] ?? '')"
+                    />
+                    {{-- Wilayah Zonasi Tarif Telkom --}}
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Wilayah / Zona Tarif Telkom
+                        </label>
+                        <select name="wilayah" x-model="wilayah" x-on:change="lookupPrice('admin')"
+                                class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
+                            <option value="">-- Pilih Wilayah (Otomatis jika kosong) --</option>
+                            <option value="Jabodetabek" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Jabodetabek' || str_contains(strtolower($simulasi->lokasi ?? ''), 'jakarta') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bogor') || str_contains(strtolower($simulasi->lokasi ?? ''), 'depok') || str_contains(strtolower($simulasi->lokasi ?? ''), 'tangerang') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bekasi')) ? 'selected' : '' }}>Jabodetabek</option>
+                            <option value="Jawa" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Jawa' || str_contains(strtolower($simulasi->lokasi ?? ''), 'jawa') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bandung') || str_contains(strtolower($simulasi->lokasi ?? ''), 'surabaya') || str_contains(strtolower($simulasi->lokasi ?? ''), 'semarang')) ? 'selected' : '' }}>Jawa</option>
+                            <option value="Sumatera" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Sumatera' || str_contains(strtolower($simulasi->lokasi ?? ''), 'sumatera') || str_contains(strtolower($simulasi->lokasi ?? ''), 'medan') || str_contains(strtolower($simulasi->lokasi ?? ''), 'palembang')) ? 'selected' : '' }}>Sumatera</option>
+                            <option value="Kalimantan / KTI" {{ (old('wilayah', $inp['wilayah'] ?? '') == 'Kalimantan / KTI' || str_contains(strtolower($simulasi->lokasi ?? ''), 'kalimantan') || str_contains(strtolower($simulasi->lokasi ?? ''), 'sulawesi') || str_contains(strtolower($simulasi->lokasi ?? ''), 'papua') || str_contains(strtolower($simulasi->lokasi ?? ''), 'makassar') || str_contains(strtolower($simulasi->lokasi ?? ''), 'balikpapan')) ? 'selected' : '' }}>Kalimantan / KTI</option>
+                        </select>
+                        <p class="text-[11px] text-slate-400 mt-1">Wilayah acuan pencocokan tarif katalog (Lokasi proyek: {{ $simulasi->lokasi ?? '-' }}).</p>
                     </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Tarif OTC (Rp) <span class="text-red-500">*</span></label>
@@ -327,8 +358,60 @@
                                    x-bind:value="display.mrc" required
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             <input type="hidden" name="mrc" x-bind:value="raw.mrc">
+                            <input type="hidden" name="tarif_normal_mrc" x-bind:value="tarifNormal">
                             <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.mrc)"></p>
                         </div>
+                    </div>
+
+                    {{-- Widget Informasi Diskon Realtime --}}
+                    <div x-show="tarifNormal > 0" x-transition class="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 space-y-3 shadow-xs">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-600 font-semibold flex items-center gap-1.5">
+                                <i data-lucide="tag" class="w-4 h-4 text-red-600"></i>
+                                <span>Tarif Resmi Katalog (Price List):</span>
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono font-bold text-slate-900 text-sm" x-text="'Rp ' + formatRp(tarifNormal) + ' /bln'"></span>
+                                <button type="button" x-show="raw.mrc !== tarifNormal" @click="applyCatalogPrice()" class="text-[11px] text-red-600 hover:text-red-700 font-semibold inline-flex items-center gap-1 hover:underline cursor-pointer">
+                                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                                    <span>Gunakan Tarif Katalog</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <template x-if="diskonNominal > 0">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <i data-lucide="percent" class="w-3.5 h-3.5"></i>
+                                        <span x-text="'Diskon ' + diskonPct + '% (Potongan Rp ' + formatRp(diskonNominal) + ')'"></span>
+                                    </span>
+                                </template>
+                                <template x-if="diskonNominal === 0">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                        <span>Tarif Normal (Tanpa Diskon)</span>
+                                    </span>
+                                </template>
+                                <template x-if="diskonNominal < 0">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                                        <span x-text="'Markup +' + Math.abs(diskonPct) + '% (+Rp ' + formatRp(Math.abs(diskonNominal)) + ')'"></span>
+                                    </span>
+                                </template>
+                            </div>
+
+                            <template x-if="diskonNominal > 0">
+                                <span class="text-xs font-medium" :class="isProfitDeficit ? 'text-rose-600 font-bold' : 'text-amber-800'">
+                                    <span x-text="profitKeterangan"></span>
+                                </span>
+                            </template>
+                        </div>
+
+                        <template x-if="isProfitDeficit">
+                            <div class="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium flex items-center gap-2">
+                                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 shrink-0"></i>
+                                <span>Peringatan: Diskon memotong seluruh target profit 30%. Harga penawaran berada di bawah modal estimasi COGS (Rp <span x-text="formatRp(cogsStandar)"></span>).</span>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
@@ -374,29 +457,29 @@
                     <div x-show="showAdvanced" class="space-y-4 pt-2">
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">BOP (%)</label>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">BOP (%) <span class="text-red-500">*</span></label>
                                 <input type="number" name="bop_pct" value="{{ old('bop_pct', $inp['bop_pct'] ?? $rdmMaster->bop_pct) }}" required step="any"
                                        class="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lifetime (Tahun)</label>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Lifetime (Tahun) <span class="text-red-500">*</span></label>
                                 <input type="number" name="lifetime" value="{{ old('lifetime', $inp['lifetime'] ?? $rdmMaster->lifetime) }}" required min="1" max="20"
                                        class="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">O&M (%)</label>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">O&M (%) <span class="text-red-500">*</span></label>
                                 <input type="number" name="om_pct" value="{{ old('om_pct', $inp['om_pct'] ?? $rdmMaster->om_pct) }}" required step="any"
                                        class="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Pajak (%)</label>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Pajak (%) <span class="text-red-500">*</span></label>
                                 <input type="number" name="tax_pct" value="{{ old('tax_pct', $inp['tax_pct'] ?? $rdmMaster->tax_pct) }}" required step="any"
                                        class="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">WACC (%)</label>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">WACC (%) <span class="text-red-500">*</span></label>
                                 <input type="number" name="wacc_pct" value="{{ old('wacc_pct', $inp['wacc_pct'] ?? $rdmMaster->wacc_pct) }}" required step="any"
                                        class="w-full h-10 rounded-lg border border-slate-300 px-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             </div>
@@ -429,6 +512,16 @@
             ),
             rdmOtcPct: parseFloat(rdmOtcPct) || 0,
             rdmMrcPct: parseFloat(rdmMrcPct) || 0,
+            wilayah: '{{ old('wilayah', $inp['wilayah'] ?? '') }}',
+            tarifNormal: {{ old('tarif_normal_mrc', $inp['tarif_normal_mrc'] ?? 0) }},
+            foundPriceList: {{ isset($inp['tarif_normal_mrc']) && $inp['tarif_normal_mrc'] > 0 ? 'true' : 'false' }},
+
+            init() {
+                this.$nextTick(() => {
+                    this.lookupPrice();
+                });
+            },
+
             get cogsOtc() {
                 return (this.raw.otc || 0) * (1 - (this.rdmOtcPct / 100));
             },
@@ -438,6 +531,88 @@
             get totalCapexBase() {
                 return (Number(this.raw.material) || 0) + (Number(this.raw.jasa) || 0);
             },
+            get diskonNominal() {
+                return this.tarifNormal > 0 ? (this.tarifNormal - (this.raw.mrc || 0)) : 0;
+            },
+            get diskonPct() {
+                if (this.tarifNormal <= 0 || this.diskonNominal === 0) return 0;
+                return ((this.diskonNominal / this.tarifNormal) * 100).toFixed(1);
+            },
+            get cogsStandar() {
+                return this.tarifNormal > 0 ? (this.tarifNormal * (1 - (this.rdmMrcPct / 100))) : 0;
+            },
+            get sisaProfitNominal() {
+                return (this.raw.mrc || 0) - this.cogsStandar;
+            },
+            get sisaProfitPct() {
+                if (!this.raw.mrc || this.raw.mrc <= 0) return 0;
+                return ((this.sisaProfitNominal / this.raw.mrc) * 100).toFixed(1);
+            },
+            get isProfitDeficit() {
+                return this.tarifNormal > 0 && this.sisaProfitNominal < 0;
+            },
+            get profitKeterangan() {
+                if (this.isProfitDeficit) {
+                    return 'Defisit Profit (Harga di bawah modal COGS)';
+                }
+                return 'Sisa Margin Profit: ' + this.sisaProfitPct + '% (Target: ' + this.rdmMrcPct + '%)';
+            },
+
+            applyCatalogPrice() {
+                if (this.tarifNormal > 0) {
+                    this.raw.mrc = this.tarifNormal;
+                    this.display.mrc = this.tarifNormal.toLocaleString('id-ID');
+                }
+            },
+
+            async lookupPrice(preferredPrefix = null, forceAutoFill = false) {
+                const prefixes = preferredPrefix ? [preferredPrefix] : ['mkt', 'admin', 'revisi_mkt'];
+                let paket = '';
+                let bw = '';
+
+                for (const pfx of prefixes) {
+                    const elP = document.getElementById(pfx + '_paketisasi');
+                    const elB = document.getElementById(pfx + '_bw_hidden');
+                    if (elP && elP.value) {
+                        paket = elP.value;
+                        bw = elB ? elB.value : '';
+                        break;
+                    }
+                }
+
+                if (!paket || !bw) return;
+
+                try {
+                    const params = new URLSearchParams({
+                        paket: paket,
+                        bandwidth: bw,
+                        wilayah: this.wilayah || ''
+                    });
+                    const res = await fetch(`/api/price-list/lookup?${params.toString()}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    const data = await res.json();
+
+                    if (data.found) {
+                        const previousNormal = this.tarifNormal;
+                        this.tarifNormal = data.tarif_normal_mrc;
+                        this.foundPriceList = true;
+                        if (forceAutoFill || !this.raw.mrc || this.raw.mrc === 0 || this.raw.mrc === previousNormal) {
+                            this.raw.mrc = data.tarif_normal_mrc;
+                            this.display.mrc = data.tarif_normal_mrc.toLocaleString('id-ID');
+                        }
+                    } else {
+                        this.foundPriceList = false;
+                        this.tarifNormal = 0;
+                    }
+                } catch (e) {
+                    console.error('Error saat lookup katalog price list:', e);
+                }
+            },
+
             handleCurrency(event, field) {
                 let digits = event.target.value.replace(/\D/g, '');
                 let num = parseInt(digits, 10) || 0;
@@ -456,4 +631,5 @@
         };
     }
     </script>
+    <script src="{{ asset('js/produk-selector.js') }}"></script>
 </x-layouts.app>

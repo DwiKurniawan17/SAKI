@@ -27,12 +27,14 @@ class CreateNewUser implements CreatesNewUsers
         ])->validate();
 
         $user = User::create([
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'phone' => $input['phone'] ?? null,
+            'name'     => $input['name'],
+            'email'    => $input['email'],
+            'phone'    => $input['phone'] ?? null,
             'password' => Hash::make($input['password']),
-            'email_verified_at' => now(),
-            'is_approved' => true, // Auto disetujui tanpa menunggu admin
+            // Email harus diverifikasi sendiri via link, bukan di-bypass
+            // 'email_verified_at' => now(),  // DIHAPUS
+            // Akun baru WAJIB menunggu persetujuan Admin/RSO sebelum bisa login
+            'is_approved' => false,
         ]);
 
         $user->assignRole($input['role']);

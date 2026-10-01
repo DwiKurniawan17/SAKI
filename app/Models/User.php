@@ -38,6 +38,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_approved' => 'boolean',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
@@ -66,19 +67,31 @@ class User extends Authenticatable
     }
 
     /**
-     * Cek apakah user ini wajib mengaktifkan 2FA
+     * Cek apakah user ini wajib mengaktifkan 2FA.
+     * Admin (RSO) dan Engineering Capex wajib karena mengelola data keuangan sensitif.
      */
     public function mustEnable2FA(): bool
     {
+        // Sementara nonaktif untuk testing
         return false;
+
+        // return $this->hasAnyRole(['admin', 'engineering_capex']);
     }
 
     /**
-     * Cek apakah 2FA sudah aktif
+     * Cek apakah 2FA sudah aktif dan terkonfirmasi.
      */
     public function has2FAEnabled(): bool
     {
-        return ! is_null($this->two_factor_secret);
+        return ! is_null($this->two_factor_secret) && ! is_null($this->two_factor_confirmed_at);
+    }
+
+    /**
+     * Cek apakah 2FA sedang dalam proses konfigurasi (secret dibuat tapi belum dikonfirmasi kode OTP).
+     */
+    public function hasPending2FA(): bool
+    {
+        return ! is_null($this->two_factor_secret) && is_null($this->two_factor_confirmed_at);
     }
 
     /**

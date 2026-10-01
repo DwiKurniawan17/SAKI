@@ -50,8 +50,8 @@
         </div>
         @endif
 
-        {{-- User: Revisi Alert --}}
-        @if(!$user->hasRole('admin') && isset($revisi) && $revisi > 0)
+        {{-- User: Revisi Alert (Hanya untuk Sales & Marketing, tidak untuk ED) --}}
+        @if($user->hasRole('sales_marketing') && isset($revisi) && $revisi > 0)
         <div class="bg-rose-50/80 border border-rose-200 rounded-xl p-4 flex items-center justify-between shadow-xs">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 bg-rose-100 rounded-lg flex items-center justify-center text-rose-700 shrink-0">
@@ -165,7 +165,12 @@
             </div>
         </div>
 
-        {{-- Status Summary Mini Cards --}}
+        {{-- Status Summary Mini Cards (Hanya ditampilkan jika ada kartu yang relevan bagi role pengguna) --}}
+        @php
+            $hasMiniCards = ($user->hasRole('admin') && (isset($pendingReview) || isset($waitingRevisiMarketing)))
+                || ($user->hasRole('sales_marketing') && isset($revisi));
+        @endphp
+        @if($hasMiniCards)
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @if($user->hasRole('admin') && isset($pendingReview))
             <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
@@ -191,7 +196,7 @@
             </div>
             @endif
 
-            @if(!$user->hasRole('admin') && isset($revisi))
+            @if($user->hasRole('sales_marketing') && isset($revisi))
             <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
                 <div>
                     <span class="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">Perlu Revisi</span>
@@ -203,6 +208,7 @@
             </div>
             @endif
         </div>
+        @endif
 
         {{-- Recent Simulasi Table --}}
         <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">

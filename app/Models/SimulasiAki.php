@@ -20,6 +20,7 @@ class SimulasiAki extends Model
         'status',
         'nama_proyek',
         'lokasi',
+        'kategori',
         'paketisasi',
         'bandwidth',
         'input_json',
@@ -48,10 +49,6 @@ class SimulasiAki extends Model
         ];
     }
 
-    protected static function booted(): void
-    {
-        static::ensureColumnsExist();
-    }
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -98,13 +95,21 @@ class SimulasiAki extends Model
         return $value ?? ($this->input_json['bandwidth'] ?? null);
     }
 
+    public function getKategoriAttribute($value)
+    {
+        return $value ?? ($this->input_json['kategori'] ?? null);
+    }
+
     public static function ensureColumnsExist(): void
     {
         try {
             if (\Illuminate\Support\Facades\Schema::hasTable('simulasi_aki')) {
                 \Illuminate\Support\Facades\Schema::table('simulasi_aki', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'kategori')) {
+                        $table->string('kategori')->nullable()->after('lokasi');
+                    }
                     if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'paketisasi')) {
-                        $table->string('paketisasi')->nullable()->after('lokasi');
+                        $table->string('paketisasi')->nullable()->after('kategori');
                     }
                     if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'bandwidth')) {
                         $table->string('bandwidth')->nullable()->after('paketisasi');

@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * HTTP security headers — CSP, X-Frame-Options, X-Content-Type-Options, dll.
+ * HTTP security headers — CSP, X-Frame-Options, X-Content-Type-Options, HSTS, dll.
  */
 class SecurityHeaders
 {
@@ -21,11 +21,17 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-        // CSP - strict but allows inline styles for Livewire/Alpine
         if (app()->environment('production')) {
+            // HSTS: paksa HTTPS selama 1 tahun, termasuk subdomains
+            $response->headers->set(
+                'Strict-Transport-Security',
+                'max-age=31536000; includeSubDomains; preload'
+            );
+
+            // CSP production: hapus 'unsafe-eval' — tidak dibutuhkan Alpine.js/Livewire
             $response->headers->set(
                 'Content-Security-Policy',
-                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
             );
         }
 

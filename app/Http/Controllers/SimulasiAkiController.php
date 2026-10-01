@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ParameterRdm;
+use App\Models\PriceList;
 use App\Models\RevisiLog;
 use App\Models\SimulasiAki;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class SimulasiAkiController extends Controller
         // Tarif OTC/MRC akan dilengkapi oleh Marketing pada langkah berikutnya.
         $validated = $request->validate([
             'nama_proyek'    => 'required|string|max:255',
-            'lokasi'         => 'nullable|string|max:255',
+            'lokasi'         => 'required|string|max:255',
             'material'       => 'required|numeric|min:0',
             'jasa'           => 'required|numeric|min:0',
         ]);
@@ -371,7 +372,12 @@ class SimulasiAkiController extends Controller
             return back()->with('error', 'Simulasi ini tidak dalam status menunggu input Marketing.');
         }
 
+        if (!$request->filled('kategori')) {
+            $request->merge(['kategori' => 'connectivity']);
+        }
+
         $validated = $request->validate([
+            'kategori'        => 'required|in:connectivity,non_connectivity',
             'paketisasi'      => 'required|string|max:255',
             'bandwidth'       => 'nullable|string|max:100',
             'otc'             => 'required|numeric|min:0',
@@ -380,32 +386,51 @@ class SimulasiAkiController extends Controller
             'bulan_tahun1'    => 'required|integer|min:1|max:12',
         ]);
 
+        // Bandwidth hanya wajib untuk produk Connectivity
+        if ($validated['kategori'] === 'connectivity') {
+            $request->validate(['bandwidth' => 'required|string|max:100']);
+        }
+
         $rdm = ParameterRdm::getActive();
         $cogsInstall = $validated['otc'] * (1 - ($rdm->rdm_otc_pct / 100));
         $cogsMonthly = $validated['mrc'] * (1 - ($rdm->rdm_mrc_pct / 100));
 
+        // Deteksi Diskon dari Katalog Price List
+        $wilayah = $request->input('wilayah');
+        $mrcVal = floatval($validated['mrc']);
+        $priceListRec = PriceList::findTarif($validated['paketisasi'], $validated['bandwidth'] ?? null, $wilayah);
+        $tarifNormal = $priceListRec ? (float) $priceListRec->tarif_normal_mrc : ($request->filled('tarif_normal_mrc') ? floatval($request->input('tarif_normal_mrc')) : null);
+        $diskonNominal = ($tarifNormal && $tarifNormal > $mrcVal) ? ($tarifNormal - $mrcVal) : 0;
+        $diskonPct = ($tarifNormal && $tarifNormal > 0 && $diskonNominal > 0) ? round(($diskonNominal / $tarifNormal) * 100, 2) : 0;
+
         $commercialData = [
-            'paketisasi'     => $validated['paketisasi'],
-            'bandwidth'      => $validated['bandwidth'] ?? null,
-            'otc'            => floatval($validated['otc']),
-            'mrc'            => floatval($validated['mrc']),
-            'durasi_kontrak' => intval($validated['durasi_kontrak']),
-            'bulan_tahun1'   => intval($validated['bulan_tahun1']),
-            'cogs_install'   => $cogsInstall,
-            'cogs_monthly'   => $cogsMonthly,
-            'rdm_otc_pct'    => $rdm->rdm_otc_pct,
-            'rdm_mrc_pct'    => $rdm->rdm_mrc_pct,
+            'kategori'         => $validated['kategori'],
+            'paketisasi'       => $validated['paketisasi'],
+            'bandwidth'        => $validated['bandwidth'] ?? null,
+            'wilayah'          => $wilayah,
+            'tarif_normal_mrc' => $tarifNormal,
+            'diskon_nominal'   => $diskonNominal,
+            'diskon_pct'       => $diskonPct,
+            'otc'              => floatval($validated['otc']),
+            'mrc'              => $mrcVal,
+            'durasi_kontrak'   => intval($validated['durasi_kontrak']),
+            'bulan_tahun1'     => intval($validated['bulan_tahun1']),
+            'cogs_install'     => $cogsInstall,
+            'cogs_monthly'     => $cogsMonthly,
+            'rdm_otc_pct'      => $rdm->rdm_otc_pct,
+            'rdm_mrc_pct'      => $rdm->rdm_mrc_pct,
             // Parameter RSO (BOP - WACC)
-            'bop_pct'        => $rdm->bop_pct,
-            'lifetime'       => $rdm->lifetime,
-            'om_pct'         => $rdm->om_pct,
-            'tax_pct'        => $rdm->tax_pct,
-            'wacc_pct'       => $rdm->wacc_pct,
+            'bop_pct'          => $rdm->bop_pct,
+            'lifetime'         => $rdm->lifetime,
+            'om_pct'           => $rdm->om_pct,
+            'tax_pct'          => $rdm->tax_pct,
+            'wacc_pct'         => $rdm->wacc_pct,
         ];
 
         $fullInput = array_merge($simulasi->input_json ?? [], $commercialData);
 
         $simulasi->user_id_pihak_b = $user->id;
+        $simulasi->kategori        = $validated['kategori'];
         $simulasi->paketisasi      = $validated['paketisasi'];
         $simulasi->bandwidth       = $validated['bandwidth'] ?? null;
         $simulasi->catatan_revisi  = null;
@@ -452,7 +477,7 @@ class SimulasiAkiController extends Controller
             $query->where('nama_proyek', 'like', '%' . $request->input('q') . '%');
         }
 
-        if ($request->filled('status')) {
+        if ($request->filled('status') && !$user->hasRole('engineering_capex')) {
             $query->where('status', $request->input('status'));
         }
 
@@ -768,7 +793,7 @@ class SimulasiAkiController extends Controller
         if ($user->hasRole('engineering_capex')) {
             $validated = $request->validate([
                 'nama_proyek'    => 'required|string|max:255',
-                'lokasi'         => 'nullable|string|max:255',
+                'lokasi'         => 'required|string|max:255',
                 'material'       => 'required|numeric|min:0',
                 'jasa'           => 'required|numeric|min:0',
             ]);
@@ -785,36 +810,58 @@ class SimulasiAkiController extends Controller
                 'rdm_mrc_pct' => $rdm->rdm_mrc_pct,
             ]);
         } elseif ($user->hasRole('sales_marketing')) {
+            if (!$request->filled('kategori')) {
+                $request->merge(['kategori' => 'connectivity']);
+            }
+
             $validated = $request->validate([
+                'kategori'        => 'required|in:connectivity,non_connectivity',
                 'paketisasi'      => 'required|string|max:255',
                 'bandwidth'       => 'nullable|string|max:100',
                 'otc'             => 'required|numeric|min:0',
                 'mrc'             => 'required|numeric|min:0',
-                'durasi_kontrak'  => 'nullable|integer|min:1|max:120',
-                'bulan_tahun1'    => 'nullable|integer|min:1|max:12',
+                'durasi_kontrak'  => 'required|integer|min:1|max:120',
+                'bulan_tahun1'    => 'required|integer|min:1|max:12',
             ]);
+            if ($validated['kategori'] === 'connectivity') {
+                $request->validate(['bandwidth' => 'required|string|max:100']);
+            }
 
             $cogsInstall = $validated['otc'] * (1 - ($rdm->rdm_otc_pct / 100));
             $cogsMonthly = $validated['mrc'] * (1 - ($rdm->rdm_mrc_pct / 100));
 
+            // Deteksi Diskon dari Katalog Price List
+            $wilayah = $request->input('wilayah', $existing['wilayah'] ?? null);
+            $mrcVal = floatval($validated['mrc']);
+            $priceListRec = PriceList::findTarif($validated['paketisasi'], $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null), $wilayah);
+            $tarifNormal = $priceListRec ? (float) $priceListRec->tarif_normal_mrc : ($request->filled('tarif_normal_mrc') ? floatval($request->input('tarif_normal_mrc')) : ($existing['tarif_normal_mrc'] ?? null));
+            $diskonNominal = ($tarifNormal && $tarifNormal > $mrcVal) ? ($tarifNormal - $mrcVal) : 0;
+            $diskonPct = ($tarifNormal && $tarifNormal > 0 && $diskonNominal > 0) ? round(($diskonNominal / $tarifNormal) * 100, 2) : 0;
+
             $fullInput = array_merge($existing, [
-                'paketisasi'     => $validated['paketisasi'],
-                'bandwidth'      => $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null),
-                'otc'            => floatval($validated['otc']),
-                'mrc'            => floatval($validated['mrc']),
-                'durasi_kontrak' => intval($validated['durasi_kontrak'] ?? $existing['durasi_kontrak'] ?? 48),
-                'bulan_tahun1'   => intval($validated['bulan_tahun1'] ?? $existing['bulan_tahun1'] ?? 6),
-                'cogs_install'   => $cogsInstall,
-                'cogs_monthly'   => $cogsMonthly,
-                'rdm_otc_pct'    => $rdm->rdm_otc_pct,
-                'rdm_mrc_pct'    => $rdm->rdm_mrc_pct,
-                'bop_pct'        => $rdm->bop_pct,
-                'lifetime'       => $rdm->lifetime,
-                'om_pct'         => $rdm->om_pct,
-                'tax_pct'        => $rdm->tax_pct,
-                'wacc_pct'       => $rdm->wacc_pct,
+                'kategori'         => $validated['kategori'],
+                'paketisasi'       => $validated['paketisasi'],
+                'bandwidth'        => $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null),
+                'wilayah'          => $wilayah,
+                'tarif_normal_mrc' => $tarifNormal,
+                'diskon_nominal'   => $diskonNominal,
+                'diskon_pct'       => $diskonPct,
+                'otc'              => floatval($validated['otc']),
+                'mrc'              => $mrcVal,
+                'durasi_kontrak'   => intval($validated['durasi_kontrak'] ?? $existing['durasi_kontrak'] ?? 48),
+                'bulan_tahun1'     => intval($validated['bulan_tahun1'] ?? $existing['bulan_tahun1'] ?? 6),
+                'cogs_install'     => $cogsInstall,
+                'cogs_monthly'     => $cogsMonthly,
+                'rdm_otc_pct'      => $rdm->rdm_otc_pct,
+                'rdm_mrc_pct'      => $rdm->rdm_mrc_pct,
+                'bop_pct'          => $rdm->bop_pct,
+                'lifetime'         => $rdm->lifetime,
+                'om_pct'           => $rdm->om_pct,
+                'tax_pct'          => $rdm->tax_pct,
+                'wacc_pct'         => $rdm->wacc_pct,
             ]);
             $simulasi->user_id_pihak_b = $user->id; // Rekam user marketing yang mengupdate revisi
+            $simulasi->kategori        = $validated['kategori'];
             $simulasi->paketisasi      = $validated['paketisasi'];
             $simulasi->bandwidth       = $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null);
             activity('simulasi')
@@ -909,20 +956,20 @@ class SimulasiAkiController extends Controller
 
         $validated = $request->validate([
             'nama_proyek'    => 'required|string|max:255',
-            'lokasi'         => 'nullable|string|max:255',
+            'lokasi'         => 'required|string|max:255',
             'durasi_kontrak' => 'required|integer|min:1|max:120',
             'bulan_tahun1'   => 'required|integer|min:1|max:12',
-            'paketisasi'     => 'nullable|string|max:255',
-            'bandwidth'      => 'nullable|string|max:100',
+            'paketisasi'     => 'required|string|max:255',
+            'bandwidth'      => 'required|string|max:100',
             'otc'            => 'required|numeric|min:0',
             'mrc'            => 'required|numeric|min:0',
             'material'       => 'required|numeric|min:0',
             'jasa'           => 'required|numeric|min:0',
-            'bop_pct'        => 'nullable|numeric|min:0|max:100',
-            'lifetime'       => 'nullable|integer|min:1|max:20',
-            'om_pct'         => 'nullable|numeric|min:0|max:50',
-            'tax_pct'        => 'nullable|numeric|min:0|max:50',
-            'wacc_pct'       => 'nullable|numeric|min:0|max:50',
+            'bop_pct'        => 'required|numeric|min:0|max:100',
+            'lifetime'       => 'required|integer|min:1|max:20',
+            'om_pct'         => 'required|numeric|min:0|max:50',
+            'tax_pct'        => 'required|numeric|min:0|max:50',
+            'wacc_pct'       => 'required|numeric|min:0|max:50',
         ]);
 
         $cogsInstall = $validated['otc'] * (1 - ($rdm->rdm_otc_pct / 100));

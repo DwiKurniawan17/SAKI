@@ -75,12 +75,12 @@
 
         {{-- Nomor Telepon --}}
         <div>
-            <label for="phone" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Nomor WhatsApp / HP</label>
+            <label for="phone" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Nomor WhatsApp / HP <span class="text-red-500">*</span></label>
             <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <i data-lucide="phone" class="w-4 h-4"></i>
                 </div>
-                <input id="phone" type="tel" name="phone" value="{{ old('phone') }}"
+                <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" required
                        placeholder="081234567890"
                        class="h-10 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3.5 text-sm text-slate-800 placeholder-slate-400 focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600 transition-colors">
             </div>

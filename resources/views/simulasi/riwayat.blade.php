@@ -23,6 +23,7 @@
                     <input type="text" name="q" value="{{ request('q') }}" placeholder="Cari nama proyek atau lokasi..."
                            class="w-full h-10 rounded-lg border border-slate-300 pl-9 pr-4 text-sm text-slate-900 placeholder-slate-400 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                 </div>
+                @unless(auth()->user()->hasRole('engineering_capex'))
                 <select name="status" class="h-10 rounded-lg border border-slate-300 px-3 text-xs text-slate-700 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white min-w-[200px]">
                     <option value="">Semua Status</option>
                     @php
@@ -37,6 +38,7 @@
                         <option value="{{ $key }}" {{ request('status') === $key ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                 </select>
+                @endunless
                 <button type="submit" class="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium px-5 h-10 rounded-lg text-xs transition-colors shadow-sm">
                     <i data-lucide="search" class="w-3.5 h-3.5"></i>
                     <span>Cari</span>
@@ -181,47 +183,44 @@
                                 {{ $item->npv ? 'Rp ' . number_format($item->npv, 0, ',', '.') : '-' }}
                             </td>
                             <td class="px-6 py-3.5 text-right">
-                                <div class="flex items-center justify-end gap-2 flex-wrap">
+                                {{-- ===== SPLIT BUTTON AKSI ===== --}}
+                                <div class="inline-flex items-center rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
 
-                                    {{-- Edit: User hanya saat status revisi miliknya --}}
+                                    {{-- [Kiri] Tombol Utama: Detail --}}
+                                    <a href="{{ route('simulasi.show', $item) }}"
+                                       title="Lihat Detail Simulasi"
+                                       class="inline-flex items-center gap-1.5 px-3 h-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-red-600 transition-colors border-r border-slate-200">
+                                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                        <span>Detail</span>
+                                    </a>
+
+                                    {{-- [Kanan] Tombol Edit (kondisional) --}}
                                     @if($item->status === \App\Models\SimulasiAki::STATUS_REVISI && (auth()->user()->hasRole('sales_marketing') || $item->user_id_pihak_b === auth()->id()))
                                     <a href="{{ route('simulasi.edit', $item) }}"
-                                       class="inline-flex items-center gap-1 text-amber-600 hover:text-amber-700 font-semibold text-xs transition-colors">
+                                       title="Revisi Simulasi"
+                                       class="inline-flex items-center justify-center w-8 h-8 text-amber-500 hover:bg-amber-50 hover:text-amber-700 transition-colors border-r border-slate-200">
                                         <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                                        <span>Revisi</span>
                                     </a>
-                                    @endif
-
-                                    {{-- Edit (admin bisa edit simulasi apapun yang belum approved) --}}
-                                    @if(auth()->user()->hasRole('admin') && $item->status !== \App\Models\SimulasiAki::STATUS_APPROVED)
+                                    @elseif(auth()->user()->hasRole('admin') && $item->status !== \App\Models\SimulasiAki::STATUS_APPROVED)
                                     <a href="{{ route('simulasi.edit', $item) }}"
-                                       class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 font-semibold text-xs transition-colors">
+                                       title="Edit Simulasi"
+                                       class="inline-flex items-center justify-center w-8 h-8 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors border-r border-slate-200">
                                         <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                                        <span>Edit</span>
                                     </a>
                                     @endif
 
-                                    {{-- Detail --}}
-                                    <a href="{{ route('simulasi.show', $item) }}"
-                                       class="text-red-600 hover:text-red-700 font-semibold text-xs transition-colors inline-flex items-center gap-0.5">
-                                        <span>Detail</span>
-                                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-                                    </a>
-
-                                    {{-- Hapus: HANYA Engineering, HANYA simulasi miliknya, HANYA saat status menunggu_pihak_b.
-                                         Admin boleh hapus semua. Marketing TIDAK boleh hapus. --}}
+                                    {{-- [Kanan] Tombol Hapus (kondisional) --}}
                                     @if(auth()->user()->hasRole('admin') ||
                                         (auth()->user()->hasRole('engineering_capex')
                                          && $item->user_id_pihak_a === auth()->id()
                                          && $item->status === \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B))
-                                    <form method="POST" action="{{ route('simulasi.destroy', $item) }}"
-                                          onsubmit="return confirm('Hapus simulasi \'{{ addslashes($item->nama_proyek) }}\' secara permanen?')"
-                                          class="inline">
+                                    <form method="POST" action="{{ route('simulasi.destroy', $item) }}" id="form-hapus-{{ $item->id }}" class="inline">
                                         @csrf @method('DELETE')
-                                        <button type="submit"
-                                                class="inline-flex items-center gap-1 text-rose-500 hover:text-rose-700 font-semibold text-xs transition-colors cursor-pointer">
+                                        <button type="button"
+                                                title="Hapus Simulasi"
+                                                onclick="bukaMOdalHapus('{{ $item->id }}', '{{ addslashes($item->nama_proyek) }}')"
+                                                class="inline-flex items-center justify-center w-8 h-8 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer">
                                             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                            <span>Hapus</span>
                                         </button>
                                     </form>
                                     @endif
@@ -243,9 +242,101 @@
                     <i data-lucide="search-x" class="w-6 h-6"></i>
                 </div>
                 <p class="font-medium text-slate-600">Tidak ada data simulasi ditemukan.</p>
-                <p class="text-xs text-slate-400 mt-1">Coba gunakan kata kunci pencarian atau filter status yang berbeda.</p>
+                <p class="text-xs text-slate-400 mt-1">
+                    {{ auth()->user()->hasRole('engineering_capex') ? 'Coba gunakan kata kunci pencarian yang berbeda.' : 'Coba gunakan kata kunci pencarian atau filter status yang berbeda.' }}
+                </p>
             </div>
             @endif
         </div>
     </div>
+
+    {{-- ===== MODAL KONFIRMASI HAPUS ===== --}}
+    <div id="modal-hapus"
+         class="fixed inset-0 z-50 hidden items-center justify-center p-4"
+         role="dialog" aria-modal="true" aria-labelledby="modal-hapus-title">
+
+        {{-- Backdrop --}}
+        <div id="modal-hapus-backdrop"
+             class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+             onclick="tutupModalHapus()"></div>
+
+        {{-- Panel --}}
+        <div id="modal-hapus-panel"
+             class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center gap-4
+                    scale-95 opacity-0 transition-all duration-200">
+
+            {{-- Ikon --}}
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
+                <i data-lucide="trash-2" class="w-7 h-7 text-rose-500"></i>
+            </div>
+
+            {{-- Teks --}}
+            <div class="text-center">
+                <h3 id="modal-hapus-title" class="text-base font-bold text-slate-900">Hapus Simulasi?</h3>
+                <p class="text-sm text-slate-500 mt-1">
+                    Kamu akan menghapus simulasi
+                    <span id="modal-hapus-nama" class="font-semibold text-slate-700"></span>
+                    secara permanen. Tindakan ini tidak dapat dibatalkan.
+                </p>
+            </div>
+
+            {{-- Tombol --}}
+            <div class="flex gap-3 w-full">
+                <button type="button"
+                        onclick="tutupModalHapus()"
+                        class="flex-1 h-10 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600
+                               hover:bg-slate-50 transition-colors cursor-pointer">
+                    Batal
+                </button>
+                <button type="button"
+                        id="modal-hapus-confirm"
+                        class="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800
+                               text-sm font-semibold text-white transition-colors cursor-pointer
+                               inline-flex items-center justify-center gap-1.5">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let _formHapusTarget = null;
+
+        function bukaMOdalHapus(id, nama) {
+            _formHapusTarget = document.getElementById('form-hapus-' + id);
+            document.getElementById('modal-hapus-nama').textContent = '\'' + nama + '\'';
+
+            const modal = document.getElementById('modal-hapus');
+            const panel = document.getElementById('modal-hapus-panel');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // Animasi masuk
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+
+            document.getElementById('modal-hapus-confirm').onclick = function () {
+                if (_formHapusTarget) _formHapusTarget.submit();
+            };
+        }
+
+        function tutupModalHapus() {
+            const modal = document.getElementById('modal-hapus');
+            const panel = document.getElementById('modal-hapus-panel');
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                _formHapusTarget = null;
+            }, 180);
+        }
+
+        // Tutup dengan Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') tutupModalHapus();
+        });
+    </script>
 </x-layouts.app>
