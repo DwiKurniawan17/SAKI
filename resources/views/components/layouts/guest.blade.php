@@ -13,16 +13,17 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col justify-between selection:bg-red-500 selection:text-white">
     {{-- Top Corporate Accent Bar --}}
     <div class="h-1 bg-gradient-to-r from-red-700 via-red-600 to-red-500 w-full fixed top-0 left-0 z-50"></div>
 
-    <div class="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6">
+    <div class="flex-1 flex flex-col items-center justify-center px-4 py-6 sm:py-8">
         <div class="w-full max-w-md">
             {{-- Logo Header --}}
-            <div class="text-center mb-8">
+            <div class="text-center mb-5">
                 <a href="/" class="inline-block hover:opacity-95 transition-opacity">
                     <x-logo class="h-10" />
                 </a>

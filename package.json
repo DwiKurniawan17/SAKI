@@ -15,6 +15,11 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
-        "alpinejs": "^3.17.1"
+        "@vitejs/plugin-react": "^4.7.0",
+        "alpinejs": "^3.17.1",
+        "lucide-react": "^1.49.0",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "recharts": "^3.10.1"
     }
 }

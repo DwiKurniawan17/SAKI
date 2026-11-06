@@ -380,10 +380,13 @@ class SimulasiAkiController extends Controller
             'kategori'        => 'required|in:connectivity,non_connectivity',
             'paketisasi'      => 'required|string|max:255',
             'bandwidth'       => 'nullable|string|max:100',
+            'wilayah'         => 'required|string|max:100',
             'otc'             => 'required|numeric|min:0',
             'mrc'             => 'required|numeric|min:0',
             'durasi_kontrak'  => 'required|integer|min:1|max:120',
             'bulan_tahun1'    => 'required|integer|min:1|max:12',
+        ], [
+            'wilayah.required' => 'Wilayah / Zona Tarif Telkom wajib dipilih terlebih dahulu.',
         ]);
 
         // Bandwidth hanya wajib untuk produk Connectivity
@@ -403,37 +406,41 @@ class SimulasiAkiController extends Controller
         $diskonNominal = ($tarifNormal && $tarifNormal > $mrcVal) ? ($tarifNormal - $mrcVal) : 0;
         $diskonPct = ($tarifNormal && $tarifNormal > 0 && $diskonNominal > 0) ? round(($diskonNominal / $tarifNormal) * 100, 2) : 0;
 
+        $now = now();
+
         $commercialData = [
-            'kategori'         => $validated['kategori'],
-            'paketisasi'       => $validated['paketisasi'],
-            'bandwidth'        => $validated['bandwidth'] ?? null,
-            'wilayah'          => $wilayah,
-            'tarif_normal_mrc' => $tarifNormal,
-            'diskon_nominal'   => $diskonNominal,
-            'diskon_pct'       => $diskonPct,
-            'otc'              => floatval($validated['otc']),
-            'mrc'              => $mrcVal,
-            'durasi_kontrak'   => intval($validated['durasi_kontrak']),
-            'bulan_tahun1'     => intval($validated['bulan_tahun1']),
-            'cogs_install'     => $cogsInstall,
-            'cogs_monthly'     => $cogsMonthly,
-            'rdm_otc_pct'      => $rdm->rdm_otc_pct,
-            'rdm_mrc_pct'      => $rdm->rdm_mrc_pct,
+            'kategori'             => $validated['kategori'],
+            'paketisasi'           => $validated['paketisasi'],
+            'bandwidth'            => $validated['bandwidth'] ?? null,
+            'wilayah'              => $wilayah,
+            'tarif_normal_mrc'     => $tarifNormal,
+            'diskon_nominal'       => $diskonNominal,
+            'diskon_pct'           => $diskonPct,
+            'otc'                  => floatval($validated['otc']),
+            'mrc'                  => $mrcVal,
+            'durasi_kontrak'       => intval($validated['durasi_kontrak']),
+            'bulan_tahun1'         => intval($validated['bulan_tahun1']),
+            'cogs_install'         => $cogsInstall,
+            'cogs_monthly'         => $cogsMonthly,
+            'rdm_otc_pct'          => $rdm->rdm_otc_pct,
+            'rdm_mrc_pct'          => $rdm->rdm_mrc_pct,
             // Parameter RSO (BOP - WACC)
-            'bop_pct'          => $rdm->bop_pct,
-            'lifetime'         => $rdm->lifetime,
-            'om_pct'           => $rdm->om_pct,
-            'tax_pct'          => $rdm->tax_pct,
-            'wacc_pct'         => $rdm->wacc_pct,
+            'bop_pct'              => $rdm->bop_pct,
+            'lifetime'             => $rdm->lifetime,
+            'om_pct'               => $rdm->om_pct,
+            'tax_pct'              => $rdm->tax_pct,
+            'wacc_pct'             => $rdm->wacc_pct,
+            'marketing_updated_at' => $now->toIso8601String(),
         ];
 
         $fullInput = array_merge($simulasi->input_json ?? [], $commercialData);
 
-        $simulasi->user_id_pihak_b = $user->id;
-        $simulasi->kategori        = $validated['kategori'];
-        $simulasi->paketisasi      = $validated['paketisasi'];
-        $simulasi->bandwidth       = $validated['bandwidth'] ?? null;
-        $simulasi->catatan_revisi  = null;
+        $simulasi->user_id_pihak_b     = $user->id;
+        $simulasi->marketing_updated_at = $now;
+        $simulasi->kategori            = $validated['kategori'];
+        $simulasi->paketisasi          = $validated['paketisasi'];
+        $simulasi->bandwidth           = $validated['bandwidth'] ?? null;
+        $simulasi->catatan_revisi      = null;
 
         activity('simulasi')
             ->causedBy($user)
@@ -547,10 +554,45 @@ class SimulasiAkiController extends Controller
             return back()->with('error', 'Gagal membuat file Excel dari mesin hitung. Pastikan API Python berjalan.');
         }
 
-        $filename = 'Resume_AKI_' . str_replace(' ', '_', $simulasi->nama_proyek) . '.xlsx';
+        $cleanProjectName = preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$simulasi->nama_proyek);
+        $cleanProjectName = trim(preg_replace('/_+/', '_', $cleanProjectName), '_');
+        $filename = 'Resume_AKI_' . ($cleanProjectName ?: 'Proyek') . '.xlsx';
 
         return response($response->body(), 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    /** Download Evaluasi Word (.docx) proxy ke Python API — hanya bisa setelah disetujui RSO. */
+    public function downloadWord(Request $request, SimulasiAki $simulasi)
+    {
+        $this->authorizeAccess($simulasi, $request->user());
+
+        if (!$simulasi->input_json) {
+            abort(400, 'Data simulasi belum lengkap.');
+        }
+
+        // Hanya bisa download jika sudah disetujui RSO
+        if ($simulasi->status !== SimulasiAki::STATUS_APPROVED) {
+            return back()->with('error', 'Simulasi harus disetujui RSO (status disetujui_rso) terlebih dahulu sebelum bisa didownload.');
+        }
+
+        $response = Http::withHeaders($this->apiHeaders())
+            ->timeout(20)
+            ->post(config('services.calc_api.url') . '/api/export-word', $simulasi->input_json);
+
+        if ($response->failed()) {
+            Log::error('Export Word gagal', ['status' => $response->status()]);
+            return back()->with('error', 'Gagal membuat file Word dari mesin hitung. Pastikan API Python berjalan.');
+        }
+
+        $cleanProjectName = preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$simulasi->nama_proyek);
+        $cleanProjectName = trim(preg_replace('/_+/', '_', $cleanProjectName), '_');
+        $filename = 'Evaluasi_AKI_' . ($cleanProjectName ?: 'Proyek') . '.docx';
+
+        return response($response->body(), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
@@ -599,6 +641,54 @@ class SimulasiAkiController extends Controller
 
         return response($response->body(), 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "inline; filename=\"{$filename}\"",
+        ]);
+    }
+
+    /** RSO: Preview Word file (.docx) before approving or printing. */
+    public function previewWord(Request $request, SimulasiAki $simulasi)
+    {
+        $user = $request->user();
+        if (!$user->hasRole('admin')) {
+            abort(403);
+        }
+
+        $existing = $simulasi->input_json ?? [];
+
+        // Support overrides from live RSO panel if submitted via POST
+        $params = $request->only([
+            'durasi_kontrak', 'bulan_tahun1', 'bop_pct', 'lifetime',
+            'om_pct', 'tax_pct', 'wacc_pct', 'rdm_otc_pct', 'rdm_mrc_pct'
+        ]);
+
+        $merged = array_merge($existing, array_filter($params, fn($v) => $v !== null && $v !== ''));
+
+        // Recalculate COGS if RDM changed
+        $otc = floatval($merged['otc'] ?? 0);
+        $mrc = floatval($merged['mrc'] ?? 0);
+        $rdmOtc = floatval($merged['rdm_otc_pct'] ?? 0);
+        $rdmMrc = floatval($merged['rdm_mrc_pct'] ?? 0);
+        $merged['cogs_install'] = $otc * (1 - ($rdmOtc / 100));
+        $merged['cogs_monthly'] = $mrc * (1 - ($rdmMrc / 100));
+        $merged['nama_proyek']  = $simulasi->nama_proyek;
+        $merged['lokasi']       = $simulasi->lokasi ?? '';
+        $merged['durasi_kontrak'] = intval($merged['durasi_kontrak'] ?? 48);
+        $merged['bulan_tahun1']   = intval($merged['bulan_tahun1'] ?? 6);
+        $merged['lifetime']       = intval($merged['lifetime'] ?? 4);
+
+        $response = Http::withHeaders($this->apiHeaders())
+            ->timeout(25)
+            ->post(config('services.calc_api.url') . '/api/export-word', $merged);
+
+        if ($response->failed()) {
+            Log::error('Preview Word gagal', ['status' => $response->status(), 'body' => $response->body()]);
+            return response()->json(['error' => 'Gagal membuat file Word preview dari mesin hitung.'], 500);
+        }
+
+        $filename = 'Preview_Evaluasi_AKI_' . str_replace(' ', '_', $simulasi->nama_proyek) . '.docx';
+
+        return response($response->body(), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Content-Disposition' => "inline; filename=\"{$filename}\"",
         ]);
     }
@@ -818,10 +908,13 @@ class SimulasiAkiController extends Controller
                 'kategori'        => 'required|in:connectivity,non_connectivity',
                 'paketisasi'      => 'required|string|max:255',
                 'bandwidth'       => 'nullable|string|max:100',
+                'wilayah'         => 'required|string|max:100',
                 'otc'             => 'required|numeric|min:0',
                 'mrc'             => 'required|numeric|min:0',
                 'durasi_kontrak'  => 'required|integer|min:1|max:120',
                 'bulan_tahun1'    => 'required|integer|min:1|max:12',
+            ], [
+                'wilayah.required' => 'Wilayah / Zona Tarif Telkom wajib dipilih terlebih dahulu.',
             ]);
             if ($validated['kategori'] === 'connectivity') {
                 $request->validate(['bandwidth' => 'required|string|max:100']);
@@ -838,32 +931,35 @@ class SimulasiAkiController extends Controller
             $diskonNominal = ($tarifNormal && $tarifNormal > $mrcVal) ? ($tarifNormal - $mrcVal) : 0;
             $diskonPct = ($tarifNormal && $tarifNormal > 0 && $diskonNominal > 0) ? round(($diskonNominal / $tarifNormal) * 100, 2) : 0;
 
+            $now = now();
             $fullInput = array_merge($existing, [
-                'kategori'         => $validated['kategori'],
-                'paketisasi'       => $validated['paketisasi'],
-                'bandwidth'        => $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null),
-                'wilayah'          => $wilayah,
-                'tarif_normal_mrc' => $tarifNormal,
-                'diskon_nominal'   => $diskonNominal,
-                'diskon_pct'       => $diskonPct,
-                'otc'              => floatval($validated['otc']),
-                'mrc'              => $mrcVal,
-                'durasi_kontrak'   => intval($validated['durasi_kontrak'] ?? $existing['durasi_kontrak'] ?? 48),
-                'bulan_tahun1'     => intval($validated['bulan_tahun1'] ?? $existing['bulan_tahun1'] ?? 6),
-                'cogs_install'     => $cogsInstall,
-                'cogs_monthly'     => $cogsMonthly,
-                'rdm_otc_pct'      => $rdm->rdm_otc_pct,
-                'rdm_mrc_pct'      => $rdm->rdm_mrc_pct,
-                'bop_pct'          => $rdm->bop_pct,
-                'lifetime'         => $rdm->lifetime,
-                'om_pct'           => $rdm->om_pct,
-                'tax_pct'          => $rdm->tax_pct,
-                'wacc_pct'         => $rdm->wacc_pct,
+                'kategori'             => $validated['kategori'],
+                'paketisasi'           => $validated['paketisasi'],
+                'bandwidth'            => $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null),
+                'wilayah'              => $wilayah,
+                'tarif_normal_mrc'     => $tarifNormal,
+                'diskon_nominal'       => $diskonNominal,
+                'diskon_pct'           => $diskonPct,
+                'otc'                  => floatval($validated['otc']),
+                'mrc'                  => $mrcVal,
+                'durasi_kontrak'       => intval($validated['durasi_kontrak'] ?? $existing['durasi_kontrak'] ?? 48),
+                'bulan_tahun1'         => intval($validated['bulan_tahun1'] ?? $existing['bulan_tahun1'] ?? 6),
+                'cogs_install'         => $cogsInstall,
+                'cogs_monthly'         => $cogsMonthly,
+                'rdm_otc_pct'          => $rdm->rdm_otc_pct,
+                'rdm_mrc_pct'          => $rdm->rdm_mrc_pct,
+                'bop_pct'              => $rdm->bop_pct,
+                'lifetime'             => $rdm->lifetime,
+                'om_pct'               => $rdm->om_pct,
+                'tax_pct'              => $rdm->tax_pct,
+                'wacc_pct'             => $rdm->wacc_pct,
+                'marketing_updated_at' => $now->toIso8601String(),
             ]);
-            $simulasi->user_id_pihak_b = $user->id; // Rekam user marketing yang mengupdate revisi
-            $simulasi->kategori        = $validated['kategori'];
-            $simulasi->paketisasi      = $validated['paketisasi'];
-            $simulasi->bandwidth       = $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null);
+            $simulasi->user_id_pihak_b     = $user->id; // Rekam user marketing yang mengupdate revisi
+            $simulasi->marketing_updated_at = $now;
+            $simulasi->kategori            = $validated['kategori'];
+            $simulasi->paketisasi          = $validated['paketisasi'];
+            $simulasi->bandwidth           = $validated['bandwidth'] ?? ($existing['bandwidth'] ?? null);
             activity('simulasi')
                 ->causedBy($user)
                 ->performedOn($simulasi)
@@ -987,4 +1083,294 @@ class SimulasiAkiController extends Controller
             'wacc_pct'     => $validated['wacc_pct'] ?? $rdm->wacc_pct,
         ]);
     }
+
+    /**
+     * Interactive Simulation Studio (React SPA Island).
+     */
+    public function studio(Request $request)
+    {
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Akses Studio Simulasi terbatas untuk RSO (Admin).');
+        }
+
+        $rdm = ParameterRdm::getActive();
+        $catalog = $this->buildCatalogMap();
+        $userRole = $request->user()->getRoleNames()->first() ?? 'admin';
+        $uniqueWilayah = PriceList::distinct()->pluck('wilayah')->filter()->values()->all();
+        if (empty($uniqueWilayah)) {
+            $uniqueWilayah = ['Jabodetabek', 'Jawa', 'Sumatera', 'Kalimantan / KTI'];
+        }
+
+        return view('simulasi.studio', [
+            'defaultRdm'     => $rdm,
+            'catalog'        => $catalog,
+            'userRole'       => $userRole,
+            'initialData'    => null,
+            'initialSummary' => null,
+            'uniqueWilayah'  => $uniqueWilayah,
+            'simulasiId'     => null,
+        ]);
+    }
+
+    /**
+     * Open existing simulation in Interactive Studio for what-if scenarios.
+     */
+    public function studioWithData(Request $request, SimulasiAki $simulasi)
+    {
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Akses Studio Simulasi terbatas untuk RSO (Admin).');
+        }
+
+        $this->authorizeAccess($simulasi, $request->user());
+
+        $rdm = ParameterRdm::getActive();
+        $catalog = $this->buildCatalogMap();
+        $userRole = $request->user()->getRoleNames()->first() ?? 'admin';
+        $uniqueWilayah = PriceList::distinct()->pluck('wilayah')->filter()->values()->all();
+        if (empty($uniqueWilayah)) {
+            $uniqueWilayah = ['Jabodetabek', 'Jawa', 'Sumatera', 'Kalimantan / KTI'];
+        }
+
+        $initialData = array_merge($simulasi->input_json ?? [], [
+            'nama_proyek'    => $simulasi->nama_proyek,
+            'lokasi'         => $simulasi->lokasi,
+            'wilayah'        => $simulasi->input_json['wilayah'] ?? 'Jabodetabek',
+            'paketisasi'     => $simulasi->paketisasi,
+            'bandwidth'      => $simulasi->bandwidth,
+            'kategori'       => $simulasi->kategori ?? 'connectivity',
+            'durasi_kontrak' => $simulasi->input_json['durasi_kontrak'] ?? ($rdm->lifetime * 12),
+            'bulan_tahun1'   => $simulasi->input_json['bulan_tahun1'] ?? 6,
+            'otc'            => $simulasi->input_json['otc'] ?? $rdm->default_otc ?? 2500000,
+            'mrc'            => $simulasi->input_json['mrc'] ?? 0,
+            'material'       => $simulasi->input_json['material'] ?? 0,
+            'jasa'           => $simulasi->input_json['jasa'] ?? 0,
+            'rdm_otc_pct'    => $simulasi->input_json['rdm_otc_pct'] ?? $rdm->rdm_otc_pct,
+            'rdm_mrc_pct'    => $simulasi->input_json['rdm_mrc_pct'] ?? $rdm->rdm_mrc_pct,
+            'bop_pct'        => $simulasi->input_json['bop_pct'] ?? $rdm->bop_pct,
+            'lifetime'       => $simulasi->input_json['lifetime'] ?? $rdm->lifetime,
+            'om_pct'         => $simulasi->input_json['om_pct'] ?? $rdm->om_pct,
+            'tax_pct'        => $simulasi->input_json['tax_pct'] ?? $rdm->tax_pct,
+            'wacc_pct'       => $simulasi->input_json['wacc_pct'] ?? $rdm->wacc_pct,
+        ]);
+
+        return view('simulasi.studio', [
+            'defaultRdm'     => $rdm,
+            'catalog'        => $catalog,
+            'userRole'       => $userRole,
+            'initialData'    => $initialData,
+            'initialSummary' => $simulasi->hasil_json,
+            'uniqueWilayah'  => $uniqueWilayah,
+            'simulasiId'     => $simulasi->id,
+            'simulasi'       => $simulasi,
+        ]);
+    }
+
+    /**
+     * Live calculation API for React Studio (debounced).
+     */
+    public function calculateLive(Request $request)
+    {
+        if (!$request->user()->hasRole('admin')) {
+            return response()->json([
+                'error' => 'Akses terbatas untuk RSO (Admin).'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'nama_proyek'    => 'nullable|string|max:255',
+            'lokasi'         => 'nullable|string|max:255',
+            'paketisasi'     => 'nullable|string|max:255',
+            'bandwidth'      => 'nullable|string|max:100',
+            'wilayah'        => 'nullable|string|max:100',
+            'durasi_kontrak' => 'required|integer|min:1|max:120',
+            'bulan_tahun1'   => 'required|integer|min:1|max:12',
+            'otc'            => 'required|numeric|min:0',
+            'mrc'            => 'required|numeric|min:0',
+            'material'       => 'required|numeric|min:0',
+            'jasa'           => 'required|numeric|min:0',
+            'bop_pct'        => 'required|numeric|min:0|max:100',
+            'lifetime'       => 'required|integer|min:1|max:20',
+            'om_pct'         => 'required|numeric|min:0|max:50',
+            'tax_pct'        => 'required|numeric|min:0|max:50',
+            'wacc_pct'       => 'required|numeric|min:0|max:50',
+            'rdm_otc_pct'    => 'required|numeric|min:0|max:100',
+            'rdm_mrc_pct'    => 'required|numeric|min:0|max:100',
+        ]);
+
+        $otc = floatval($validated['otc']);
+        $mrc = floatval($validated['mrc']);
+        $cogsInstall = $otc * (1 - ($validated['rdm_otc_pct'] / 100));
+        $cogsMonthly = $mrc * (1 - ($validated['rdm_mrc_pct'] / 100));
+
+        $payload = array_merge($validated, [
+            'cogs_install' => $cogsInstall,
+            'cogs_monthly' => $cogsMonthly,
+        ]);
+
+        $response = Http::withHeaders($this->apiHeaders())
+            ->timeout(30)
+            ->post(config('services.calc_api.url') . '/api/calculate', $payload);
+
+        if ($response->failed()) {
+            return response()->json([
+                'error' => 'Gagal menghubungi mesin hitung kalkulasi (FastAPI). Pastikan service port 8001 aktif.'
+            ], 500);
+        }
+
+        return response()->json($response->json());
+    }
+
+    /**
+     * Save simulation directly from React Studio.
+     */
+    public function saveStudio(Request $request)
+    {
+        $user = $request->user();
+        if (!$user->hasRole('admin')) {
+            return response()->json([
+                'error' => 'Akses terbatas untuk RSO (Admin).'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'nama_proyek'    => 'required|string|max:255',
+            'lokasi'         => 'required|string|max:255',
+            'durasi_kontrak' => 'required|integer|min:1|max:120',
+            'bulan_tahun1'   => 'required|integer|min:1|max:12',
+            'paketisasi'     => 'nullable|string|max:255',
+            'bandwidth'      => 'nullable|string|max:100',
+            'wilayah'        => 'nullable|string|max:100',
+            'otc'            => 'required|numeric|min:0',
+            'mrc'            => 'required|numeric|min:0',
+            'material'       => 'required|numeric|min:0',
+            'jasa'           => 'required|numeric|min:0',
+            'bop_pct'        => 'required|numeric|min:0|max:100',
+            'lifetime'       => 'required|integer|min:1|max:20',
+            'om_pct'         => 'required|numeric|min:0|max:50',
+            'tax_pct'        => 'required|numeric|min:0|max:50',
+            'wacc_pct'       => 'required|numeric|min:0|max:50',
+            'rdm_otc_pct'    => 'required|numeric|min:0|max:100',
+            'rdm_mrc_pct'    => 'required|numeric|min:0|max:100',
+            'simulasi_id'    => 'nullable|integer|exists:simulasi_aki,id',
+        ]);
+
+        $otc = floatval($validated['otc']);
+        $mrc = floatval($validated['mrc']);
+        $cogsInstall = $otc * (1 - ($validated['rdm_otc_pct'] / 100));
+        $cogsMonthly = $mrc * (1 - ($validated['rdm_mrc_pct'] / 100));
+
+        $inputPayload = array_merge($validated, [
+            'cogs_install' => $cogsInstall,
+            'cogs_monthly' => $cogsMonthly,
+        ]);
+
+        $simulasi = null;
+        if (!empty($validated['simulasi_id'])) {
+            $simulasi = SimulasiAki::findOrFail($validated['simulasi_id']);
+            $this->authorizeAccess($simulasi, $user);
+
+            // Proteksi: jangan izinkan menimpa simulasi yang sudah disetujui resmi oleh RSO
+            if ($simulasi->status === SimulasiAki::STATUS_APPROVED) {
+                return response()->json([
+                    'error' => 'Simulasi ini telah berstatus Disetujui (Approved) oleh RSO dan tidak dapat diubah lagi.'
+                ], 422);
+            }
+        }
+
+        $response = Http::withHeaders($this->apiHeaders())
+            ->timeout(30)
+            ->post(config('services.calc_api.url') . '/api/calculate', $inputPayload);
+
+        if ($response->failed()) {
+            return response()->json([
+                'error' => 'Gagal menghubungi mesin kalkulasi.'
+            ], 500);
+        }
+
+        $summary = $response->json();
+
+        if (!$simulasi) {
+            $simulasi = new SimulasiAki();
+            $simulasi->user_id_pihak_a = $user->id;
+            $simulasi->user_id_pihak_b = $user->id;
+        }
+
+        $simulasi->nama_proyek    = $validated['nama_proyek'];
+        $simulasi->lokasi         = $validated['lokasi'];
+        $simulasi->paketisasi     = $validated['paketisasi'] ?? null;
+        $simulasi->bandwidth      = $validated['bandwidth'] ?? null;
+        $simulasi->kategori       = $request->input('kategori', 'connectivity');
+        $simulasi->input_json     = $inputPayload;
+        $simulasi->hasil_json     = $summary;
+        $simulasi->npv            = $summary['npv'] ?? null;
+        $simulasi->mirr           = $summary['irr'] ?? null;
+        $simulasi->payback_period = $summary['pbp'] ?? null;
+        $simulasi->layak          = $summary['layak'] ?? null;
+        $simulasi->status         = SimulasiAki::STATUS_MENUNGGU_REVIEW;
+        $simulasi->save();
+
+        activity('simulasi')
+            ->causedBy($user)
+            ->performedOn($simulasi)
+            ->log("Pengguna ({$user->name}) menyimpan simulasi via Studio Interaktif React");
+
+        return response()->json([
+            'success'      => true,
+            'message'      => 'Simulasi berhasil disimpan dan dikirim untuk penelaahan RSO!',
+            'redirect_url' => route('simulasi.show', $simulasi),
+            'id'           => $simulasi->id,
+        ]);
+    }
+
+    private function buildCatalogMap(): array
+    {
+        $catalog = [];
+        try {
+            $items = PriceList::select('paketisasi', 'bandwidth', 'wilayah', 'tarif_normal_mrc', 'updated_at')->get();
+            foreach ($items as $item) {
+                if (!$item->paketisasi) continue;
+                if (!isset($catalog[$item->paketisasi])) {
+                    $catalog[$item->paketisasi] = [
+                        'bw' => [],
+                        'wilayah' => [],
+                        'prices' => [],
+                        'updated_at' => [],
+                    ];
+                }
+                if ($item->bandwidth && !in_array($item->bandwidth, $catalog[$item->paketisasi]['bw'])) {
+                    $catalog[$item->paketisasi]['bw'][] = $item->bandwidth;
+                }
+                if ($item->wilayah && !in_array($item->wilayah, $catalog[$item->paketisasi]['wilayah'])) {
+                    $catalog[$item->paketisasi]['wilayah'][] = $item->wilayah;
+                }
+                if ($item->bandwidth && $item->wilayah) {
+                    $key = $item->bandwidth . '|' . $item->wilayah;
+                    $catalog[$item->paketisasi]['prices'][$key] = (float) $item->tarif_normal_mrc;
+                    $catalog[$item->paketisasi]['updated_at'][$key] = $item->updated_at ? $item->updated_at->translatedFormat('d M Y, H:i') . ' WIB' : null;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Catalog map error: ' . $e->getMessage());
+        }
+
+        if (empty($catalog)) {
+            $catalog = [
+                'Astinet' => [
+                    'bw' => ['10 Mbps', '20 Mbps', '50 Mbps', '100 Mbps', '200 Mbps', '500 Mbps', '1 Gbps'],
+                    'prices' => [],
+                ],
+                'Indibiz' => [
+                    'bw' => ['50 Mbps', '100 Mbps', '200 Mbps', '300 Mbps'],
+                    'prices' => [],
+                ],
+                'VPN IP'  => [
+                    'bw' => ['2 Mbps', '5 Mbps', '10 Mbps', '20 Mbps', '50 Mbps'],
+                    'prices' => [],
+                ],
+            ];
+        }
+
+        return $catalog;
+    }
 }
+

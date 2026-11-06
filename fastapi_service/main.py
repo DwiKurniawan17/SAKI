@@ -13,13 +13,14 @@ Endpoint:
 import os
 
 from engine import calculate_aki, export_excel_bytes, goal_seek_aki
+from word_export import build_evaluasi_word
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-APP_API_KEY = os.environ.get("APP_API_KEY", "")  # isi di .env, kosong = auth dimatikan (dev only)
+APP_API_KEY = os.environ.get("APP_API_KEY", "kenko-paper-clips")  # isi di .env, kosong = auth dimatikan (dev only)
 
-app = FastAPI(title="AKI/CAPEX Calculation Service", version="1.1.0")
+app = FastAPI(title="AKI/CAPEX Calculation Service", version="1.2.0")
 
 
 class SimulasiInput(BaseModel):
@@ -79,5 +80,19 @@ def export_excel(payload: SimulasiInput, x_api_key: str | None = Header(default=
   return Response(
       content=xlsx_bytes,
       media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+  )
+
+
+@app.post("/api/export-word")
+def export_word(payload: SimulasiInput, x_api_key: str | None = Header(default=None)):
+  _check_key(x_api_key)
+  p = payload.model_dump()
+  summary = calculate_aki(p)
+  docx_bytes = build_evaluasi_word(p, summary)
+  filename = f"Evaluasi_AKI_{payload.nama_proyek.replace(' ', '_')}.docx"
+  return Response(
+      content=docx_bytes,
+      media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       headers={"Content-Disposition": f'attachment; filename="{filename}"'},
   )

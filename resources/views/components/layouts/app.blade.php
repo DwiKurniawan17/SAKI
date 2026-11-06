@@ -16,6 +16,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
@@ -192,9 +193,9 @@
                 <span>Riwayat Simulasi</span>
             </a>
 
-            {{-- Admin-only Section --}}
+            {{-- Admin-only Section (RSO) --}}
             @if(auth()->user()->hasRole('admin'))
-            <p class="px-2.5 pt-4 pb-1 text-[10px] font-bold text-red-200 uppercase tracking-wider">Administrator</p>
+            <p class="px-2.5 pt-4 pb-1 text-[10px] font-bold text-red-200 uppercase tracking-wider">Administrator (RSO)</p>
 
             {{-- Review --}}
             @php

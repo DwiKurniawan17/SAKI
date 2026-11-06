@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,7 +13,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasRoles, HasApiTokens, TwoFactorAuthenticatable, LogsActivity;
@@ -23,6 +24,8 @@ class User extends Authenticatable
         'phone',
         'password',
         'is_approved',
+        'verification_code',
+        'verification_code_expires_at',
     ];
 
     protected $hidden = [
@@ -30,12 +33,15 @@ class User extends Authenticatable
         'remember_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'verification_code',
+        'verification_code_expires_at',
     ];
 
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'verification_code_expires_at' => 'datetime',
             'password' => 'hashed',
             'is_approved' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
@@ -106,6 +112,66 @@ class User extends Authenticatable
             'admin'             => 'RSO (Admin)',
             default             => $role ? ucwords(str_replace('_', ' ', $role)) : 'User',
         };
+    }
+
+    /**
+     * Generate 6-digit kode verifikasi email dan simpan ke database.
+     */
+    public function generateEmailVerificationCode(): string
+    {
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $this->forceFill([
+            'verification_code' => $code,
+            'verification_code_expires_at' => now()->addMinutes(15),
+        ])->saveQuietly();
+
+        return $code;
+    }
+
+    /**
+     * Kirim email kode verifikasi OTP.
+     */
+    public function sendEmailVerificationOtpNotification(): void
+    {
+        $code = $this->generateEmailVerificationCode();
+        $this->notify(new \App\Notifications\EmailVerificationOtpNotification($code));
+    }
+
+    /**
+     * Override method Laravel untuk verifikasi email agar memakai OTP code.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->sendEmailVerificationOtpNotification();
+    }
+
+    /**
+     * Validasi kode verifikasi yang diinput oleh user.
+     */
+    public function verifyEmailCode(string $inputCode): bool
+    {
+        if (!$this->verification_code || !$this->verification_code_expires_at) {
+            return false;
+        }
+
+        if (now()->gt($this->verification_code_expires_at)) {
+            return false;
+        }
+
+        if (trim((string) $this->verification_code) !== trim((string) $inputCode)) {
+            return false;
+        }
+
+        $this->forceFill([
+            'email_verified_at' => now(),
+            'verification_code' => null,
+            'verification_code_expires_at' => null,
+        ])->saveQuietly();
+
+        event(new \Illuminate\Auth\Events\Verified($this));
+
+        return true;
     }
 }
 

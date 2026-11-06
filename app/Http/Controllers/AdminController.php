@@ -52,6 +52,10 @@ class AdminController extends Controller
             'role' => 'required|in:admin,sales_marketing,engineering_capex',
         ]);
 
+        if ($user->id === $request->user()->id && $validated['role'] !== 'admin') {
+            return back()->with('error', 'Anda tidak dapat mengubah role akun administrator Anda sendiri demi mencegah penguncian sistem (admin lockout).');
+        }
+
         $user->syncRoles([$validated['role']]);
 
         activity('admin')

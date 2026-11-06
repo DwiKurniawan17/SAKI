@@ -23,6 +23,18 @@ class FortifyServiceProvider extends ServiceProvider
             \Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider::class,
             \App\Services\PHPGangstaTwoFactorProvider::class
         );
+
+        $this->app->singleton(
+            \Laravel\Fortify\Contracts\RegisterResponse::class,
+            function () {
+                return new class implements \Laravel\Fortify\Contracts\RegisterResponse {
+                    public function toResponse($request)
+                    {
+                        return redirect()->route('verification.notice');
+                    }
+                };
+            }
+        );
     }
 
     public function boot(): void
@@ -53,7 +65,9 @@ class FortifyServiceProvider extends ServiceProvider
                         ->withProperties(['ip' => $request->ip(), 'reason' => 'account_not_approved'])
                         ->log('Login ditolak: akun belum disetujui admin');
 
-                    return null;
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'email' => 'Akun Anda telah terverifikasi, namun belum disetujui oleh Administrator/RSO. Silakan hubungi admin untuk aktivasi akun.',
+                    ]);
                 }
 
                 // Log successful authentication

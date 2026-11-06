@@ -4,6 +4,13 @@
         <p class="text-xs text-slate-500 mt-1">Portal Simulasi AKI & Evaluasi Investasi CAPEX</p>
     </div>
 
+    @if(session('status'))
+    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3.5 mb-5 flex items-start gap-2.5">
+        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+        <p class="text-xs text-emerald-700 font-medium leading-relaxed">{{ session('status') }}</p>
+    </div>
+    @endif
+
     @if($errors->any())
     <div class="bg-red-50 border border-red-200 rounded-lg p-3.5 mb-5 flex items-start gap-2.5">
         <i data-lucide="alert-circle" class="w-4 h-4 text-red-600 shrink-0 mt-0.5"></i>
@@ -15,20 +22,45 @@
     </div>
     @endif
 
-    <div x-data="{
+    <div id="login-root" x-data="{
         email: '{{ old('email') }}',
         password: '',
         showPassword: false,
-        fill(e, p) {
+        selectedEmail: '{{ old('email') }}',
+        fill(e, p, autoSubmit = false) {
             this.email = e;
             this.password = p;
+            this.selectedEmail = e;
+
+            const emailInput = document.getElementById('email');
+            const passInput = document.getElementById('password');
+            const formEl = document.getElementById('form-login');
+
+            if (emailInput) {
+                emailInput.value = e;
+                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (passInput) {
+                passInput.value = p;
+                passInput.dispatchEvent(new Event('input', { bubbles: true }));
+                passInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            if (autoSubmit && formEl) {
+                formEl.submit();
+                return;
+            }
+
             $nextTick(() => {
                 const submitBtn = document.getElementById('btn-submit-login');
-                if (submitBtn) submitBtn.focus();
+                if (submitBtn) {
+                    submitBtn.focus();
+                }
             });
         }
     }">
-        <form method="POST" action="{{ route('login') }}" class="space-y-4">
+        <form id="form-login" method="POST" action="{{ route('login') }}" class="space-y-4">
             @csrf
 
             <div>
@@ -95,6 +127,14 @@
                 @php
                     $testAccounts = [
                         [
+                            'name' => 'RSO Administrator (Admin)',
+                            'email' => 'admin@telkom.co.id',
+                            'role' => 'Review & Approval Akun',
+                            'icon' => 'shield-check',
+                            'badgeClass' => 'bg-purple-50 text-purple-700 border-purple-200',
+                            'hoverClass' => 'hover:border-purple-300 hover:bg-purple-50/40',
+                        ],
+                        [
                             'name' => 'Engineer Development (ED)',
                             'email' => 'ed@telkom.co.id',
                             'role' => 'Pihak A (Input CAPEX)',
@@ -110,44 +150,96 @@
                             'badgeClass' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                             'hoverClass' => 'hover:border-emerald-300 hover:bg-emerald-50/40',
                         ],
-                        [
-                            'name' => 'RSO Administrator (Admin)',
-                            'email' => 'admin@telkom.co.id',
-                            'role' => 'Admin (Review & Approval)',
-                            'icon' => 'shield-check',
-                            'badgeClass' => 'bg-purple-50 text-purple-700 border-purple-200',
-                            'hoverClass' => 'hover:border-purple-300 hover:bg-purple-50/40',
-                        ],
                     ];
                 @endphp
 
                 @foreach($testAccounts as $acc)
-                <button type="button"
-                        @click="fill('{{ $acc['email'] }}', 'password')"
-                        class="w-full text-left flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-white {{ $acc['hoverClass'] }} transition-all group cursor-pointer shadow-xs">
-                    <div class="flex items-center gap-2.5">
+                <div data-email="{{ $acc['email'] }}"
+                     onclick="window.fillTestAccount('{{ $acc['email'] }}', 'password', false)"
+                     @click="fill('{{ $acc['email'] }}', 'password', false)"
+                     :class="selectedEmail === '{{ $acc['email'] }}' ? 'border-red-600 bg-red-50/30 ring-1 ring-red-600/30' : 'border-slate-200 bg-white {{ $acc['hoverClass'] }}'"
+                     class="test-account-item w-full flex items-center justify-between p-2 sm:p-2.5 rounded-xl border transition-all shadow-xs group cursor-pointer {{ old('email') === $acc['email'] ? 'border-red-600 bg-red-50/30 ring-1 ring-red-600/30' : 'border-slate-200 bg-white ' . $acc['hoverClass'] }}">
+                    <div class="flex items-center gap-2.5 text-left flex-1 min-w-0 pr-2 pointer-events-none">
                         <div class="w-8 h-8 rounded-lg flex items-center justify-center border {{ $acc['badgeClass'] }} shrink-0">
                             <i data-lucide="{{ $acc['icon'] }}" class="w-4 h-4"></i>
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <div class="flex items-center gap-1.5">
-                                <span class="text-xs font-bold text-slate-900 group-hover:text-red-600 transition-colors">{{ $acc['name'] }}</span>
+                                <span class="text-xs font-bold text-slate-900 group-hover:text-red-600 transition-colors truncate">{{ $acc['name'] }}</span>
+                                <span x-show="selectedEmail === '{{ $acc['email'] }}'" class="selected-badge text-[9px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase tracking-wider" style="display: none;">Terpilih</span>
                             </div>
-                            <p class="text-[11px] text-slate-500 font-mono">{{ $acc['email'] }}</p>
+                            <p class="text-[11px] text-slate-500 font-mono truncate">{{ $acc['email'] }}</p>
                         </div>
                     </div>
-                    <div class="text-right shrink-0">
-                        <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 group-hover:text-red-600 transition-colors">
-                            <span>Pilih</span>
-                            <i data-lucide="arrow-right" class="w-3 h-3"></i>
-                        </span>
-                        <p class="text-[10px] text-slate-400">{{ $acc['role'] }}</p>
-                    </div>
-                </button>
+                    <button type="button"
+                            onclick="event.stopPropagation(); window.fillTestAccount('{{ $acc['email'] }}', 'password', true);"
+                            @click.stop="fill('{{ $acc['email'] }}', 'password', true)"
+                            title="Klik untuk langsung masuk sebagai {{ $acc['name'] }}"
+                            class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 hover:text-white bg-slate-100 hover:bg-red-600 active:bg-red-700 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-red-600 transition-all cursor-pointer shadow-xs">
+                        <span>Masuk</span>
+                        <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                    </button>
+                </div>
                 @endforeach
             </div>
         </div>
     </div>
+
+    <script>
+        window.fillTestAccount = function(e, p, autoSubmit = false) {
+            const emailInput = document.getElementById('email');
+            const passInput = document.getElementById('password');
+            const formEl = document.getElementById('form-login');
+
+            if (emailInput) {
+                emailInput.value = e;
+                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (passInput) {
+                passInput.value = p;
+                passInput.dispatchEvent(new Event('input', { bubbles: true }));
+                passInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            const loginRoot = document.getElementById('login-root');
+            if (loginRoot && window.Alpine) {
+                try {
+                    const data = window.Alpine.$data(loginRoot);
+                    if (data) {
+                        data.email = e;
+                        data.password = p;
+                        data.selectedEmail = e;
+                    }
+                } catch(err) {}
+            }
+
+            // Visual active highlight
+            document.querySelectorAll('.test-account-item').forEach(card => {
+                const isMatch = card.dataset.email === e;
+                const badge = card.querySelector('.selected-badge');
+                if (isMatch) {
+                    card.classList.add('border-red-600', 'bg-red-50/30', 'ring-1', 'ring-red-600/30');
+                    card.classList.remove('border-slate-200', 'bg-white');
+                    if (badge) badge.style.display = 'inline-block';
+                } else {
+                    card.classList.remove('border-red-600', 'bg-red-50/30', 'ring-1', 'ring-red-600/30');
+                    card.classList.add('border-slate-200', 'bg-white');
+                    if (badge) badge.style.display = 'none';
+                }
+            });
+
+            if (autoSubmit && formEl) {
+                formEl.submit();
+                return;
+            }
+
+            const submitBtn = document.getElementById('btn-submit-login');
+            if (submitBtn) {
+                submitBtn.focus();
+            }
+        };
+    </script>
 
     <div class="mt-6 pt-5 border-t border-slate-100 text-center">
         <p class="text-xs text-slate-500">

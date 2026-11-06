@@ -13,7 +13,7 @@
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^4.4",
-        "phpgangsta/googleauthenticator": "dev-master",
+        "phpgangsta/googleauthenticator": "dev-master#505c2af8337b559b33557f37cda38e5f843f3768",
         "phpmailer/phpmailer": "^7.1",
         "phpoffice/phpspreadsheet": "^5.9",
         "pragmarx/google2fa-laravel": "^3.0",

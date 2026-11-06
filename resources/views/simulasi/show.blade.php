@@ -9,10 +9,12 @@
     >
         {{-- Top Bar --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <a href="{{ route('simulasi.riwayat') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">
-                <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                <span>Kembali ke Riwayat</span>
-            </a>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('simulasi.riwayat') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span>Kembali ke Riwayat</span>
+                </a>
+            </div>
             @if($simulasi->status === \App\Models\SimulasiAki::STATUS_APPROVED)
             <div class="flex items-center gap-2">
                 @if($user->hasRole('admin'))
@@ -33,10 +35,31 @@
                         </span>
                     </template>
                 </button>
+                <button type="button" 
+                        @click="openWordPreview()" 
+                        :disabled="wordPreviewLoading" 
+                        class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 text-xs font-semibold px-4 h-10 rounded-lg border border-slate-300 shadow-sm transition-all">
+                    <template x-if="!wordPreviewLoading">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="file-text" class="w-4 h-4 text-blue-600"></i>
+                            <span>Preview Word</span>
+                        </span>
+                    </template>
+                    <template x-if="wordPreviewLoading">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-slate-500"></i>
+                            <span>Memuat...</span>
+                        </span>
+                    </template>
+                </button>
                 @endif
                 <a href="{{ route('simulasi.download', $simulasi) }}" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 h-10 rounded-lg shadow-sm transition-all">
                     <i data-lucide="download" class="w-4 h-4"></i>
                     <span>Download Excel (.xlsx)</span>
+                </a>
+                <a href="{{ route('simulasi.downloadWord', $simulasi) }}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 h-10 rounded-lg shadow-sm transition-all">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span>Download Word (.docx)</span>
                 </a>
             </div>
             @else
@@ -59,10 +82,27 @@
                         </span>
                     </template>
                 </button>
+                <button type="button" 
+                        @click="openWordPreview()" 
+                        :disabled="wordPreviewLoading" 
+                        class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 text-xs font-semibold px-4 h-10 rounded-lg border border-slate-300 shadow-sm transition-all">
+                    <template x-if="!wordPreviewLoading">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="file-text" class="w-4 h-4 text-blue-600"></i>
+                            <span>Preview Format Word</span>
+                        </span>
+                    </template>
+                    <template x-if="wordPreviewLoading">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-slate-500"></i>
+                            <span>Memuat Preview Word...</span>
+                        </span>
+                    </template>
+                </button>
                 @endif
-                <div class="inline-flex items-center gap-2 bg-slate-100 border border-slate-200 text-slate-400 text-xs font-medium px-3.5 h-10 rounded-lg cursor-not-allowed" title="Download Excel hanya aktif setelah disetujui RSO">
+                <div class="inline-flex items-center gap-2 bg-slate-100 border border-slate-200 text-slate-400 text-xs font-medium px-3.5 h-10 rounded-lg cursor-not-allowed" title="Download Excel & Word hanya aktif setelah disetujui RSO">
                     <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i>
-                    <span>Download Excel (Menunggu Approval)</span>
+                    <span>Download (Menunggu Approval)</span>
                 </div>
             </div>
             @endif
@@ -89,9 +129,15 @@
 
                     {{-- Marketing (Pengisi / Pengupdate Komersial) --}}
                     @if($simulasi->pihakB)
-                    <span class="inline-flex items-center gap-1.5 font-medium text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200" title="Parameter komersial dilengkapi oleh Divisi Marketing">
+                    <span class="inline-flex items-center gap-1.5 font-medium text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200" title="Parameter komersial dilengkapi / diupdate oleh Divisi Marketing">
                         <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-600"></i>
-                        <span>Diupdate Komersial (MKT): <strong class="text-blue-900">{{ $simulasi->pihakB->name }}</strong>@if(auth()->id() === $simulasi->pihakB->id) <span class="text-blue-400 font-normal text-[11px]">(Anda)</span>@endif</span>
+                        <span>Diupdate Komersial (MKT): <strong class="text-blue-900">{{ $simulasi->pihakB->name }}</strong>
+                        @if($simulasi->marketing_updated_at)
+                            <span class="text-blue-700 font-semibold text-[11px]">({{ $simulasi->marketing_updated_at->translatedFormat('d M Y, H:i') }} WIB &bull; {{ $simulasi->marketing_updated_at->diffForHumans() }})</span>
+                        @else
+                            <span class="text-blue-600 font-normal text-[11px]">({{ $simulasi->updated_at->translatedFormat('d M Y, H:i') }} WIB)</span>
+                        @endif
+                        @if(auth()->id() === $simulasi->pihakB->id) <span class="text-blue-400 font-normal text-[11px]">(Anda)</span>@endif</span>
                     </span>
                     <span class="text-slate-300">•</span>
                     @elseif($simulasi->status === \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B)
@@ -275,11 +321,44 @@
         </div>
         @endif
 
+        {{-- Alert Notifikasi RSO: Laporan Telah Diupdate Marketing --}}
+        @if($user->hasRole('admin') && in_array($simulasi->status, [\App\Models\SimulasiAki::STATUS_MENUNGGU_REVIEW, \App\Models\SimulasiAki::STATUS_LENGKAP_TERHITUNG]))
+        <div class="bg-blue-50/90 border border-blue-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div class="flex items-start sm:items-center gap-3.5">
+                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0 border border-blue-200">
+                    <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-200 text-blue-900">Laporan Siap Direview RSO</span>
+                        <span class="text-xs text-blue-800 font-semibold">• Divisi Marketing</span>
+                    </div>
+                    <h3 class="text-sm font-bold text-blue-950 mt-0.5">Laporan Telah Diupdate oleh Marketing</h3>
+                    <p class="text-xs text-blue-800 mt-0.5">
+                        Marketing (<strong>{{ $simulasi->pihakB?->name ?? 'Sales & Marketing' }}</strong>) telah mengupdate parameter komersial
+                        @if($simulasi->marketing_updated_at)
+                            pada <strong>{{ $simulasi->marketing_updated_at->translatedFormat('d M Y, H:i') }} WIB</strong> ({{ $simulasi->marketing_updated_at->diffForHumans() }})
+                        @endif
+                        . Silakan periksa parameter, preview format Excel, dan tentukan evaluasi kelayakan.
+                    </p>
+                </div>
+            </div>
+            @if($simulasi->marketing_updated_at)
+            <div class="bg-white/90 border border-blue-200 px-3.5 py-2 rounded-lg text-left sm:text-right shrink-0 shadow-2xs">
+                <span class="text-[10px] uppercase font-bold text-blue-600 block tracking-wider">Update Marketing</span>
+                <span class="text-xs font-bold text-blue-950 font-mono">{{ $simulasi->marketing_updated_at->translatedFormat('d M Y, H:i') }} WIB</span>
+                <span class="text-[10px] text-blue-600 block">{{ $simulasi->marketing_updated_at->diffForHumans() }}</span>
+            </div>
+            @endif
+        </div>
+        @endif
+
         {{-- RSO Review Actions (admin only, saat status menunggu_review) --}}
         @if($user->hasRole('admin') && in_array($simulasi->status, [\App\Models\SimulasiAki::STATUS_MENUNGGU_REVIEW, \App\Models\SimulasiAki::STATUS_LENGKAP_TERHITUNG]))
         @php
             $rdmMaster = \App\Models\ParameterRdm::getActive();
             $inp = $simulasi->input_json ?? [];
+            $matchingPriceList = \App\Models\PriceList::findTarif($simulasi->paketisasi, $simulasi->bandwidth, $inp['wilayah'] ?? null);
         @endphp
         <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-7 shadow-sm space-y-6">
 
@@ -310,6 +389,15 @@
                             <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-500"></i>
                             <span>{{ $simulasi->pihakB?->name ?? 'Belum Diisi' }}</span>
                         </span>
+                        @if($simulasi->marketing_updated_at)
+                        <span class="text-[10px] text-blue-600 font-medium block mt-0.5" title="{{ $simulasi->marketing_updated_at->translatedFormat('l, d F Y - H:i:s') }} WIB">
+                            Update MKT: {{ $simulasi->marketing_updated_at->translatedFormat('d M Y, H:i') }} WIB ({{ $simulasi->marketing_updated_at->diffForHumans() }})
+                        </span>
+                        @elseif($simulasi->pihakB)
+                        <span class="text-[10px] text-slate-400 block mt-0.5" title="{{ $simulasi->updated_at->translatedFormat('l, d F Y - H:i:s') }} WIB">
+                            Diupdate: {{ $simulasi->updated_at->translatedFormat('d M Y, H:i') }} WIB
+                        </span>
+                        @endif
                     </div>
                     <div><span class="text-slate-500 block text-[11px]">Nama Proyek</span><span class="font-semibold text-slate-900">{{ $simulasi->nama_proyek }}</span></div>
                     <div><span class="text-slate-500 block text-[11px]">Lokasi</span><span class="font-semibold text-slate-900">{{ $simulasi->lokasi ?? '-' }}</span></div>
@@ -327,6 +415,12 @@
                                 <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
                                     Diskon {{ $inp['diskon_pct'] }}% (Katalog: Rp {{ number_format($inp['tarif_normal_mrc'] ?? 0, 0, ',', '.') }})
                                 </span>
+                            </div>
+                        @endif
+                        @if($matchingPriceList)
+                            <div class="mt-1 flex items-center gap-1 text-[10px] text-slate-500" title="Waktu update resmi tarif katalog RSO">
+                                <i data-lucide="clock" class="w-3 h-3 text-slate-400 shrink-0"></i>
+                                <span>Katalog RSO diupdate: <strong class="text-slate-700">{{ $matchingPriceList->updated_at->translatedFormat('d M Y, H:i') }} WIB</strong> ({{ $matchingPriceList->updated_at->diffForHumans() }})</span>
                             </div>
                         @endif
                     </div>
@@ -447,45 +541,59 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <template x-if="result.goal_seek.min_mrc">
-                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
-                                <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                                    <i data-lucide="trending-up" class="w-3.5 h-3.5 text-amber-600"></i>
-                                    <span>Minimal Tarif Bulanan (MRC)</span>
-                                </span>
-                                <span class="text-sm font-bold font-mono text-slate-900 block" x-text="'Rp ' + formatRp(result.goal_seek.min_mrc)"></span>
-                                <span class="text-[11px] text-amber-700" x-text="'Naik Rp ' + formatRp(result.goal_seek.delta_mrc) + ' dari MRC saat ini'"></span>
-                            </div>
-                        </template>
-                        <template x-if="result.goal_seek.min_otc">
-                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
-                                <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                                    <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-600"></i>
-                                    <span>Minimal Biaya Pasang (OTC)</span>
-                                </span>
-                                <span class="text-sm font-bold font-mono text-slate-900 block" x-text="'Rp ' + formatRp(result.goal_seek.min_otc)"></span>
-                                <span class="text-[11px] text-amber-700" x-text="'Naik Rp ' + formatRp(result.goal_seek.delta_otc) + ' dari OTC saat ini'"></span>
+                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 flex flex-col justify-between shadow-xs">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+                                        <i data-lucide="trending-up" class="w-3.5 h-3.5 text-amber-600"></i>
+                                        <span>Minimal Tarif Bulanan (MRC)</span>
+                                    </span>
+                                    <span class="text-sm font-bold font-mono text-slate-900 block" x-text="'Rp ' + formatRp(result.goal_seek.min_mrc)"></span>
+                                    <span class="text-[11px] text-amber-700 block" x-text="'Naik Rp ' + formatRp(result.goal_seek.delta_mrc) + ' dari MRC saat ini'"></span>
+                                </div>
+                                <button type="button" 
+                                        @click="applyGoalSeekCatatan('mrc')"
+                                        class="mt-3 w-full py-1.5 px-2.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-amber-300 shadow-2xs cursor-pointer">
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-700"></i>
+                                    <span>Masukkan ke Catatan Revisi</span>
+                                </button>
                             </div>
                         </template>
                         <template x-if="result.goal_seek.max_capex">
-                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
-                                <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                                    <i data-lucide="scissors" class="w-3.5 h-3.5 text-amber-600"></i>
-                                    <span>Target Efisiensi CAPEX</span>
-                                </span>
-                                <span class="text-sm font-bold font-mono text-slate-900 block" x-text="'Rp ' + formatRp(result.goal_seek.max_capex)"></span>
-                                <span class="text-[11px] text-amber-700" x-text="'Pangkas Rp ' + formatRp(result.goal_seek.delta_capex) + ' dari CAPEX saat ini'"></span>
+                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 flex flex-col justify-between shadow-xs">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+                                        <i data-lucide="scissors" class="w-3.5 h-3.5 text-amber-600"></i>
+                                        <span>Target Efisiensi CAPEX</span>
+                                    </span>
+                                    <span class="text-sm font-bold font-mono text-slate-900 block" x-text="'Rp ' + formatRp(result.goal_seek.max_capex)"></span>
+                                    <span class="text-[11px] text-amber-700 block" x-text="'Pangkas Rp ' + formatRp(result.goal_seek.delta_capex) + ' dari CAPEX saat ini'"></span>
+                                </div>
+                                <button type="button" 
+                                        @click="applyGoalSeekCatatan('capex')"
+                                        class="mt-3 w-full py-1.5 px-2.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-amber-300 shadow-2xs cursor-pointer">
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-700"></i>
+                                    <span>Masukkan ke Catatan Revisi</span>
+                                </button>
                             </div>
                         </template>
                         <template x-if="result.goal_seek.min_durasi">
-                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
-                                <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-600"></i>
-                                    <span>Tambahan Durasi Kontrak</span>
-                                </span>
-                                <span class="text-sm font-bold font-mono text-slate-900 block" x-text="result.goal_seek.min_durasi + ' Bulan'"></span>
-                                <span class="text-[11px] text-amber-700" x-text="'Perpanjang +' + result.goal_seek.delta_durasi + ' bulan dari durasi saat ini'"></span>
+                            <div class="bg-white rounded-lg p-3.5 border border-amber-200 flex flex-col justify-between shadow-xs">
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+                                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-600"></i>
+                                        <span>Tambahan Durasi Kontrak</span>
+                                    </span>
+                                    <span class="text-sm font-bold font-mono text-slate-900 block" x-text="result.goal_seek.min_durasi + ' Bulan'"></span>
+                                    <span class="text-[11px] text-amber-700 block" x-text="'Perpanjang +' + result.goal_seek.delta_durasi + ' bulan dari durasi saat ini'"></span>
+                                </div>
+                                <button type="button" 
+                                        @click="applyGoalSeekCatatan('durasi')"
+                                        class="mt-3 w-full py-1.5 px-2.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-amber-300 shadow-2xs cursor-pointer">
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-700"></i>
+                                    <span>Masukkan ke Catatan Revisi</span>
+                                </button>
                             </div>
                         </template>
                     </div>
@@ -498,7 +606,7 @@
             </template>
 
             {{-- Actions --}}
-            <div class="flex flex-col sm:flex-row gap-3 pt-2" x-data="{ showReject: false }">
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
                 <form id="rso-approve-form" method="POST" action="{{ route('simulasi.approve', $simulasi) }}" class="flex-1">
                     @csrf
                     <input type="hidden" name="bop_pct" :value="params.bop_pct">
@@ -532,6 +640,24 @@
                     </template>
                 </button>
 
+                <button type="button" 
+                        @click="openWordPreview()" 
+                        :disabled="wordPreviewLoading" 
+                        class="h-11 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 font-medium px-5 rounded-lg text-sm border border-slate-300 transition-colors shadow-sm flex items-center justify-center gap-2">
+                    <template x-if="!wordPreviewLoading">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="file-text" class="w-4 h-4 text-blue-600"></i>
+                            <span>Preview Format Word</span>
+                        </span>
+                    </template>
+                    <template x-if="wordPreviewLoading">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-slate-500"></i>
+                            <span>Memuat Preview Word...</span>
+                        </span>
+                    </template>
+                </button>
+
                 <div class="space-y-3">
                     <button @click="showReject = !showReject" class="w-full sm:w-auto h-11 bg-white hover:bg-rose-50 text-rose-700 font-medium px-4 rounded-lg text-sm border border-rose-200 transition-colors flex items-center justify-center gap-2">
                         <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
@@ -540,33 +666,46 @@
                     <div x-show="showReject" x-transition class="bg-white rounded-xl border border-rose-200 p-4 shadow-sm space-y-3">
                         {{-- Auto-fill hint from goal seek --}}
                         <template x-if="result.layak === false && result.goal_seek && result.goal_seek.needed">
-                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 space-y-1">
-                                <span class="font-bold flex items-center gap-1.5">
-                                    <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-600"></i>
-                                    <span>Saran revisi berdasarkan Goal Seek:</span>
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 space-y-2">
+                                <span class="font-bold flex items-center gap-1.5 text-amber-950">
+                                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-600"></i>
+                                    <span>Klik salah satu saran Goal Seek di bawah untuk mengisi catatan otomatis:</span>
                                 </span>
-                                <ul class="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pl-1">
+                                <div class="flex flex-wrap gap-2">
                                     <template x-if="result.goal_seek.min_mrc">
-                                        <li x-text="'Naikkan MRC minimal ke Rp ' + formatRp(result.goal_seek.min_mrc) + ' (+Rp ' + formatRp(result.goal_seek.delta_mrc) + ')'"></li>
-                                    </template>
-                                    <template x-if="result.goal_seek.min_otc">
-                                        <li x-text="'Naikkan OTC minimal ke Rp ' + formatRp(result.goal_seek.min_otc) + ' (+Rp ' + formatRp(result.goal_seek.delta_otc) + ')'"></li>
+                                        <button type="button" 
+                                                @click="applyGoalSeekCatatan('mrc')"
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 transition-colors shadow-2xs cursor-pointer">
+                                            <i data-lucide="trending-up" class="w-3.5 h-3.5 text-amber-600"></i>
+                                            <span>Naikkan MRC ke Rp <strong x-text="formatRp(result.goal_seek.min_mrc)"></strong></span>
+                                        </button>
                                     </template>
                                     <template x-if="result.goal_seek.min_durasi">
-                                        <li x-text="'Perpanjang durasi kontrak minimal ke ' + result.goal_seek.min_durasi + ' bulan (+' + result.goal_seek.delta_durasi + ' bulan)'"></li>
+                                        <button type="button" 
+                                                @click="applyGoalSeekCatatan('durasi')"
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 transition-colors shadow-2xs cursor-pointer">
+                                            <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-600"></i>
+                                            <span>Perpanjang Durasi ke <strong x-text="result.goal_seek.min_durasi + ' Bulan'"></strong></span>
+                                        </button>
                                     </template>
                                     <template x-if="result.goal_seek.max_capex">
-                                        <li x-text="'Efisiensi CAPEX ke Rp ' + formatRp(result.goal_seek.max_capex) + ' (pangkas Rp ' + formatRp(result.goal_seek.delta_capex) + ')'"></li>
+                                        <button type="button" 
+                                                @click="applyGoalSeekCatatan('capex')"
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 transition-colors shadow-2xs cursor-pointer">
+                                            <i data-lucide="scissors" class="w-3.5 h-3.5 text-amber-600"></i>
+                                            <span>Efisiensi CAPEX ke Rp <strong x-text="formatRp(result.goal_seek.max_capex)"></strong></span>
+                                        </button>
                                     </template>
-                                </ul>
+                                </div>
                             </div>
                         </template>
                         <form method="POST" action="{{ route('simulasi.reject', $simulasi) }}" class="space-y-3">
                             @csrf
                             <input type="hidden" name="target_revisi" value="marketing">
                             <label class="block text-xs font-semibold text-rose-900">Catatan Revisi untuk Marketing <span class="text-rose-500">*</span></label>
-                            <textarea name="catatan_revisi" required rows="3" placeholder="Jelaskan penyesuaian yang diperlukan (OTC, MRC, Durasi Kontrak, dsb)..."
-                                      class="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none"></textarea>
+                            <textarea id="textarea_catatan_revisi" name="catatan_revisi" x-model="catatanRevisi" required rows="3"
+                                      placeholder="Pilih salah satu saran Goal Seek di atas atau ketik penyesuaian yang diperlukan (MRC, Durasi Kontrak, Efisiensi CAPEX, dsb)..."
+                                      class="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition"></textarea>
                             <button type="submit" class="h-9 bg-red-600 hover:bg-red-700 text-white font-medium px-4 rounded-lg text-xs transition-colors shadow-sm inline-flex items-center gap-1.5">
                                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                                 Kirim Revisi ke Marketing
@@ -600,7 +739,7 @@
                     <p class="text-[11px] text-amber-800 mt-0.5">Batas parameter minimal agar simulasi memenuhi kriteria <strong>LAYAK INVESTASI</strong>:</p>
                 </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 @if(!empty($gs['min_mrc']))
                 <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
                     <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
@@ -609,26 +748,6 @@
                     </span>
                     <span class="text-sm font-bold font-mono text-slate-900 block">Rp {{ number_format($gs['min_mrc'], 0, ',', '.') }}</span>
                     <span class="text-[11px] text-amber-700">Naik <strong>Rp {{ number_format($gs['delta_mrc'], 0, ',', '.') }}</strong> dari MRC sebelumnya</span>
-                </div>
-                @endif
-                @if(!empty($gs['min_otc']))
-                <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
-                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                        <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-600"></i>
-                        <span>Minimal Biaya Pasang (OTC)</span>
-                    </span>
-                    <span class="text-sm font-bold font-mono text-slate-900 block">Rp {{ number_format($gs['min_otc'], 0, ',', '.') }}</span>
-                    <span class="text-[11px] text-amber-700">Naik <strong>Rp {{ number_format($gs['delta_otc'], 0, ',', '.') }}</strong> dari OTC sebelumnya</span>
-                </div>
-                @endif
-                @if(!empty($gs['min_durasi']))
-                <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
-                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-600"></i>
-                        <span>Tambahan Durasi Kontrak</span>
-                    </span>
-                    <span class="text-sm font-bold font-mono text-slate-900 block">{{ $gs['min_durasi'] }} Bulan</span>
-                    <span class="text-[11px] text-amber-700">Perpanjang <strong>+{{ $gs['delta_durasi'] }} bulan</strong> dari durasi sebelumnya</span>
                 </div>
                 @endif
                 @if(!empty($gs['max_capex']))
@@ -641,6 +760,16 @@
                     <span class="text-[11px] text-amber-700">Pangkas <strong>Rp {{ number_format($gs['delta_capex'], 0, ',', '.') }}</strong> dari CAPEX saat ini</span>
                 </div>
                 @endif
+                @if(!empty($gs['min_durasi']))
+                <div class="bg-white rounded-lg p-3.5 border border-amber-200 space-y-1 shadow-xs">
+                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-600"></i>
+                        <span>Tambahan Durasi Kontrak</span>
+                    </span>
+                    <span class="text-sm font-bold font-mono text-slate-900 block">{{ $gs['min_durasi'] }} Bulan</span>
+                    <span class="text-[11px] text-amber-700">Perpanjang <strong>+{{ $gs['delta_durasi'] }} bulan</strong> dari durasi sebelumnya</span>
+                </div>
+                @endif
             </div>
             <div class="flex items-center gap-2 text-[11px] text-amber-800 border-t border-amber-200/80 pt-2.5">
                 <i data-lucide="info" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
@@ -649,7 +778,7 @@
         </div>
         @endif
 
-        <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-7 shadow-sm space-y-5" x-data="mktCompleteForm({{ $rdmMaster->rdm_otc_pct ?? 0 }}, {{ $rdmMaster->rdm_mrc_pct ?? 0 }}, 'show_revisi')">
+        <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-7 shadow-sm space-y-5" x-data="mktCompleteForm({{ $rdmMaster->rdm_otc_pct ?? 0 }}, {{ $rdmMaster->rdm_mrc_pct ?? 0 }}, 'show_revisi', {{ $rdmMaster->default_otc ?? 2500000 }})">
             <div class="border-b border-slate-200 pb-4">
                 <div class="flex items-center gap-2 mb-1.5">
                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200">Divisi Marketing</span>
@@ -662,33 +791,19 @@
                 </p>
             </div>
 
-            <form method="POST" action="{{ route('simulasi.update', $simulasi) }}" x-on:change="lookupPrice()" class="space-y-5">
+            <form method="POST" action="{{ route('simulasi.update', $simulasi) }}" x-on:change="handleFormChange($event)" class="space-y-5">
                 @csrf
                 @method('PUT')
 
-                {{-- Paketisasi & Bandwidth (dinamis) --}}
+                {{-- Paketisasi, Wilayah, & Bandwidth (dinamis katalog Price List) --}}
                 <x-produk-selector
                     prefix="show_revisi"
                     :kategori="old('kategori', $simulasi->kategori ?? '')"
                     :paketisasi="old('paketisasi', $simulasi->paketisasi ?? '')"
+                    :wilayah="old('wilayah', $simulasi->input_json['wilayah'] ?? '')"
                     :bandwidth="old('bandwidth', $simulasi->bandwidth ?? '')"
+                    :lokasi="$simulasi->lokasi ?? null"
                 />
-
-                {{-- Wilayah Zonasi Tarif Telkom --}}
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Wilayah / Zona Tarif Telkom
-                    </label>
-                    <select name="wilayah" x-model="wilayah" x-on:change="lookupPrice()"
-                            class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
-                        <option value="">-- Pilih Wilayah (Otomatis jika kosong) --</option>
-                        <option value="Jabodetabek" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Jabodetabek') ? 'selected' : '' }}>Jabodetabek</option>
-                        <option value="Jawa" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Jawa') ? 'selected' : '' }}>Jawa</option>
-                        <option value="Sumatera" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Sumatera') ? 'selected' : '' }}>Sumatera</option>
-                        <option value="Kalimantan / KTI" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Kalimantan / KTI') ? 'selected' : '' }}>Kalimantan / KTI</option>
-                    </select>
-                    <p class="text-[11px] text-slate-400 mt-1">Digunakan untuk mencocokkan harga resmi katalog berdasarkan wilayah (Lokasi: {{ $simulasi->lokasi ?? '-' }}).</p>
-                </div>
 
                 {{-- Durasi Kontrak & Bulan di Tahun 1 --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -710,12 +825,25 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Tarif OTC (One-Time Charge) (Rp) <span class="text-red-500">*</span></label>
-                        <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'otc')" x-on:focus="selectAll($event)"
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-slate-700">Tarif OTC (One-Time Charge) (Rp) <span class="text-red-500">*</span></label>
+                            <button type="button" @click="raw.otc = defaultOtc; display.otc = Number(defaultOtc).toLocaleString('id-ID')" class="text-[11px] text-slate-500 hover:text-red-600 font-semibold inline-flex items-center gap-1 hover:underline cursor-pointer" title="Gunakan tarif standar tahunan OTC">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                                <span>Standar: Rp {{ number_format($rdmMaster->default_otc ?? 2500000, 0, ',', '.') }}</span>
+                            </button>
+                        </div>
+                        <input type="text" inputmode="numeric" name="otc_display" data-currency="true"
+                               x-on:input="handleCurrency($event, 'otc')"
+                               x-on:focus="selectAll($event)"
+                               x-on:blur="handleBlur($event, 'otc')"
+                               x-on:change.stop
                                x-bind:value="display.otc" required
                                class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
                         <input type="hidden" name="otc" x-bind:value="raw.otc">
-                        <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.otc)"></p>
+                        <div class="flex items-center justify-between mt-1 text-xs">
+                            <span class="text-[11px] text-slate-400">Default standar (bisa diedit jika ada negosiasi).</span>
+                            <span class="font-mono text-slate-600 font-medium" x-text="'Rp ' + formatRp(raw.otc)"></span>
+                        </div>
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
@@ -725,13 +853,23 @@
                                 <span>Gunakan Tarif Katalog</span>
                             </button>
                         </div>
-                        <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'mrc')" x-on:focus="selectAll($event)"
+                        <input type="text" inputmode="numeric" name="mrc_display" data-currency="true"
+                               x-on:input="handleCurrency($event, 'mrc')"
+                               x-on:focus="selectAll($event)"
+                               x-on:blur="handleBlur($event, 'mrc')"
+                               x-on:change.stop
                                x-bind:value="display.mrc" required
                                class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
                         <input type="hidden" name="mrc" x-bind:value="raw.mrc">
                         <input type="hidden" name="tarif_normal_mrc" x-bind:value="tarifNormal">
                         <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.mrc)"></p>
                     </div>
+                </div>
+
+                {{-- Info jika wilayah belum dipilih --}}
+                <div x-show="!wilayah" class="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 flex items-center gap-2.5 text-xs text-amber-800">
+                    <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                    <span>Silakan pilih <strong>Wilayah / Zona Tarif Telkom</strong> di atas agar tarif resmi katalog otomatis dimuat.</span>
                 </div>
 
                 {{-- Widget Keterangan Diskon & Profit Real-time --}}
@@ -741,7 +879,12 @@
                             <i data-lucide="tag" class="w-4 h-4 text-red-600"></i>
                             <span>Tarif Resmi Katalog (Price List):</span>
                         </span>
-                        <span class="font-mono font-bold text-slate-900 text-sm" x-text="'Rp ' + formatRp(tarifNormal) + ' /bln'"></span>
+                        <div class="text-right">
+                            <span class="font-mono font-bold text-slate-900 text-sm" x-text="'Rp ' + formatRp(tarifNormal) + ' /bln'"></span>
+                            <template x-if="updatedAt">
+                                <span class="block text-[10px] text-slate-400 font-normal mt-0.5" x-text="'Diupdate: ' + updatedAt"></span>
+                            </template>
+                        </div>
                     </div>
 
                     <div class="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
@@ -774,7 +917,7 @@
                     <template x-if="isProfitDeficit">
                         <div class="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium flex items-center gap-2">
                             <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 shrink-0"></i>
-                            <span>Peringatan: Diskon memotong seluruh target profit 30%. Harga penawaran berada di bawah modal estimasi COGS (Rp <span x-text="formatRp(cogsStandar)"></span>).</span>
+                            <span>Peringatan: Diskon (<span x-text="diskonPct"></span>%) memotong seluruh batas target margin profit (<span x-text="rdmMrcPct"></span>%). Penawaran mengalami defisit margin profit (<span x-text="sisaProfitPct"></span>%).</span>
                         </div>
                     </template>
                 </div>
@@ -797,7 +940,7 @@
         @if($simulasi->status === \App\Models\SimulasiAki::STATUS_MENUNGGU_PIHAK_B)
             @if(auth()->user()->hasRole('sales_marketing'))
             @php $rdmMaster = \App\Models\ParameterRdm::getActive(); @endphp
-            <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-7 shadow-sm space-y-5" x-data="mktCompleteForm({{ $rdmMaster->rdm_otc_pct ?? 0 }}, {{ $rdmMaster->rdm_mrc_pct ?? 0 }}, 'show_mkt')">
+            <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-7 shadow-sm space-y-5" x-data="mktCompleteForm({{ $rdmMaster->rdm_otc_pct ?? 0 }}, {{ $rdmMaster->rdm_mrc_pct ?? 0 }}, 'show_mkt', {{ $rdmMaster->default_otc ?? 2500000 }})">
                 <div class="border-b border-slate-200 pb-4">
                     <div class="flex items-center gap-2 mb-1.5">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200">Divisi Marketing</span>
@@ -810,31 +953,17 @@
                     </p>
                 </div>
 
-                <form method="POST" action="{{ route('simulasi.completeMarketing', $simulasi) }}" x-on:change="lookupPrice()" class="space-y-5">
+                <form method="POST" action="{{ route('simulasi.completeMarketing', $simulasi) }}" x-on:change="handleFormChange($event)" class="space-y-5">
                     @csrf
-                    {{-- Paketisasi & Bandwidth (dinamis) --}}
+                    {{-- Paketisasi, Wilayah, & Bandwidth (dinamis katalog Price List) --}}
                     <x-produk-selector
                         prefix="show_mkt"
                         :kategori="old('kategori', $simulasi->kategori ?? '')"
                         :paketisasi="old('paketisasi', $simulasi->paketisasi ?? '')"
+                        :wilayah="old('wilayah', $simulasi->input_json['wilayah'] ?? '')"
                         :bandwidth="old('bandwidth', $simulasi->bandwidth ?? '')"
+                        :lokasi="$simulasi->lokasi ?? null"
                     />
-
-                    {{-- Wilayah Zonasi Tarif Telkom --}}
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Wilayah / Zona Tarif Telkom
-                        </label>
-                        <select name="wilayah" x-model="wilayah" x-on:change="lookupPrice()"
-                                class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm text-slate-900 focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
-                            <option value="">-- Pilih Wilayah (Otomatis jika kosong) --</option>
-                            <option value="Jabodetabek" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Jabodetabek' || str_contains(strtolower($simulasi->lokasi ?? ''), 'jakarta') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bogor') || str_contains(strtolower($simulasi->lokasi ?? ''), 'depok') || str_contains(strtolower($simulasi->lokasi ?? ''), 'tangerang') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bekasi')) ? 'selected' : '' }}>Jabodetabek</option>
-                            <option value="Jawa" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Jawa' || str_contains(strtolower($simulasi->lokasi ?? ''), 'jawa') || str_contains(strtolower($simulasi->lokasi ?? ''), 'bandung') || str_contains(strtolower($simulasi->lokasi ?? ''), 'surabaya') || str_contains(strtolower($simulasi->lokasi ?? ''), 'semarang')) ? 'selected' : '' }}>Jawa</option>
-                            <option value="Sumatera" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Sumatera' || str_contains(strtolower($simulasi->lokasi ?? ''), 'sumatera') || str_contains(strtolower($simulasi->lokasi ?? ''), 'medan') || str_contains(strtolower($simulasi->lokasi ?? ''), 'palembang')) ? 'selected' : '' }}>Sumatera</option>
-                            <option value="Kalimantan / KTI" {{ (old('wilayah', $simulasi->input_json['wilayah'] ?? '') == 'Kalimantan / KTI' || str_contains(strtolower($simulasi->lokasi ?? ''), 'kalimantan') || str_contains(strtolower($simulasi->lokasi ?? ''), 'sulawesi') || str_contains(strtolower($simulasi->lokasi ?? ''), 'papua') || str_contains(strtolower($simulasi->lokasi ?? ''), 'makassar') || str_contains(strtolower($simulasi->lokasi ?? ''), 'balikpapan')) ? 'selected' : '' }}>Kalimantan / KTI</option>
-                        </select>
-                        <p class="text-[11px] text-slate-400 mt-1">Digunakan untuk mencocokkan harga resmi katalog berdasarkan wilayah proyek (Lokasi ED: <strong>{{ $simulasi->lokasi ?? '-' }}</strong>).</p>
-                    </div>
 
                     {{-- Durasi Kontrak & Bulan di Tahun 1 --}}
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -856,13 +985,26 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Tarif OTC (One-Time Charge) (Rp) <span class="text-red-500">*</span></label>
-                            <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'otc')" x-on:focus="selectAll($event)"
-                                   x-bind:value="display.otc" required
-                                   class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
-                            <input type="hidden" name="otc" x-bind:value="raw.otc">
-                            <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.otc)"></p>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-slate-700">Tarif OTC (One-Time Charge) (Rp) <span class="text-red-500">*</span></label>
+                            <button type="button" @click="raw.otc = defaultOtc; display.otc = Number(defaultOtc).toLocaleString('id-ID')" class="text-[11px] text-slate-500 hover:text-red-600 font-semibold inline-flex items-center gap-1 hover:underline cursor-pointer" title="Gunakan tarif standar tahunan OTC">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                                <span>Standar: Rp {{ number_format($rdmMaster->default_otc ?? 2500000, 0, ',', '.') }}</span>
+                            </button>
                         </div>
+                        <input type="text" inputmode="numeric" name="otc_display" data-currency="true"
+                               x-on:input="handleCurrency($event, 'otc')"
+                               x-on:focus="selectAll($event)"
+                               x-on:blur="handleBlur($event, 'otc')"
+                               x-on:change.stop
+                               x-bind:value="display.otc" required
+                               class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
+                        <input type="hidden" name="otc" x-bind:value="raw.otc">
+                        <div class="flex items-center justify-between mt-1 text-xs">
+                            <span class="text-[11px] text-slate-400">Default standar (bisa diedit jika ada negosiasi).</span>
+                            <span class="font-mono text-slate-600 font-medium" x-text="'Rp ' + formatRp(raw.otc)"></span>
+                        </div>
+                    </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="block text-xs font-semibold text-slate-700">Tarif MRC (Monthly Recurring) (Rp) <span class="text-red-500">*</span></label>
@@ -871,13 +1013,23 @@
                                     <span>Gunakan Tarif Katalog</span>
                                 </button>
                             </div>
-                            <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'mrc')" x-on:focus="selectAll($event)"
+                            <input type="text" inputmode="numeric" name="mrc_display" data-currency="true"
+                                   x-on:input="handleCurrency($event, 'mrc')"
+                                   x-on:focus="selectAll($event)"
+                                   x-on:blur="handleBlur($event, 'mrc')"
+                                   x-on:change.stop
                                    x-bind:value="display.mrc" required
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none bg-white">
                             <input type="hidden" name="mrc" x-bind:value="raw.mrc">
                             <input type="hidden" name="tarif_normal_mrc" x-bind:value="tarifNormal">
                             <p class="text-xs text-slate-500 mt-1 text-right font-mono" x-text="'Rp ' + formatRp(raw.mrc)"></p>
                         </div>
+                    </div>
+
+                    {{-- Info jika wilayah belum dipilih --}}
+                    <div x-show="!wilayah" class="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 flex items-center gap-2.5 text-xs text-amber-800">
+                        <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                        <span>Silakan pilih <strong>Wilayah / Zona Tarif Telkom</strong> di atas agar tarif resmi katalog otomatis dimuat.</span>
                     </div>
 
                     {{-- Widget Informasi Diskon Realtime --}}
@@ -887,7 +1039,12 @@
                                 <i data-lucide="tag" class="w-4 h-4 text-red-600"></i>
                                 <span>Tarif Resmi Katalog (Price List):</span>
                             </span>
-                            <span class="font-mono font-bold text-slate-900 text-sm" x-text="'Rp ' + formatRp(tarifNormal) + ' /bln'"></span>
+                            <div class="text-right">
+                                <span class="font-mono font-bold text-slate-900 text-sm" x-text="'Rp ' + formatRp(tarifNormal) + ' /bln'"></span>
+                                <template x-if="updatedAt">
+                                    <span class="block text-[10px] text-slate-400 font-normal mt-0.5" x-text="'Diupdate: ' + updatedAt"></span>
+                                </template>
+                            </div>
                         </div>
 
                         <div class="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
@@ -923,7 +1080,7 @@
                         <template x-if="isProfitDeficit">
                             <div class="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium flex items-center gap-2">
                                 <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 shrink-0"></i>
-                                <span>Peringatan: Diskon memotong seluruh target profit 30%. Harga penawaran berada di bawah modal estimasi COGS (Rp <span x-text="formatRp(cogsStandar)"></span>).</span>
+                                <span>Peringatan: Diskon (<span x-text="diskonPct"></span>%) memotong seluruh batas target margin profit (<span x-text="rdmMrcPct"></span>%). Penawaran mengalami defisit margin profit (<span x-text="sisaProfitPct"></span>%).</span>
                             </div>
                         </template>
                     </div>
@@ -1045,6 +1202,12 @@
                 </span>
             </div>
         </div>
+
+        {{-- Visualisasi Proyeksi Arus Kas & Finansial (Interactive Chart) --}}
+        <div id="react-cashflow-chart"
+             data-summary="{{ json_encode($simulasi->hasil_json) }}"
+             class="transition-all">
+        </div>
         @endif
 
         {{-- ===== GOAL SEEK: Rekomendasi "Kurang Berapa Lagi" (Hanya saat sudah review/approved) ===== --}}
@@ -1061,7 +1224,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 {{-- a) Minimal MRC --}}
                 @if($gs['min_mrc'])
                 <div class="bg-white rounded-lg p-4 border border-amber-200 space-y-1 shadow-xs">
@@ -1074,19 +1237,7 @@
                 </div>
                 @endif
 
-                {{-- b) Minimal OTC --}}
-                @if($gs['min_otc'])
-                <div class="bg-white rounded-lg p-4 border border-amber-200 space-y-1 shadow-xs">
-                    <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                        <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-600"></i>
-                        <span>Minimal Biaya Pasang (OTC)</span>
-                    </span>
-                    <span class="text-base font-bold font-mono text-slate-900 block">Rp {{ number_format($gs['min_otc'], 0, ',', '.') }}</span>
-                    <span class="text-xs text-amber-700">Naik <strong>Rp {{ number_format($gs['delta_otc'], 0, ',', '.') }}</strong> dari OTC saat ini</span>
-                </div>
-                @endif
-
-                {{-- c) Target Efisiensi CAPEX --}}
+                {{-- b) Target Efisiensi CAPEX --}}
                 @if($gs['max_capex'])
                 <div class="bg-white rounded-lg p-4 border border-amber-200 space-y-1 shadow-xs">
                     <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
@@ -1098,7 +1249,7 @@
                 </div>
                 @endif
 
-                {{-- d) Tambahan Durasi Kontrak --}}
+                {{-- c) Tambahan Durasi Kontrak --}}
                 @if($gs['min_durasi'])
                 <div class="bg-white rounded-lg p-4 border border-amber-200 space-y-1 shadow-xs">
                     <span class="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
@@ -1628,31 +1779,442 @@
             </div>
         </div>
         @endif
+
+        {{-- ================= WORD PREVIEW MODAL (ADMIN ONLY) ================= --}}
+        @if($user->hasRole('admin'))
+        <div x-show="wordPreviewOpen" 
+             x-cloak
+             class="fixed inset-0 z-50 overflow-y-auto"
+             aria-labelledby="modal-word-preview" 
+             role="dialog" 
+             aria-modal="true">
+            
+            {{-- Backdrop --}}
+            <div x-show="wordPreviewOpen"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
+                 @click="wordPreviewOpen = false"></div>
+
+            <div class="fixed inset-0 z-10 overflow-y-auto p-2 sm:p-4 md:p-6 flex min-h-full items-center justify-center">
+                <div x-show="wordPreviewOpen"
+                     x-transition:enter="ease-out duration-300"
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave="ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     class="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col max-h-[94vh]"
+                     @click.stop>
+                    
+                    {{-- Modal Header: Microsoft Word Corporate Blue Bar --}}
+                    <div class="bg-blue-800 text-white px-6 py-3.5 flex items-center justify-between shadow-sm shrink-0">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0 border border-white/20 text-white">
+                                <i data-lucide="file-text" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-bold text-sm sm:text-base text-white truncate">
+                                        Preview Dokumen Word (.docx): {{ $simulasi->nama_proyek }}
+                                    </h3>
+                                    <span class="hidden sm:inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-950/60 text-blue-200 border border-blue-500/40">
+                                        Format Resmi: Evaluasi AKI
+                                    </span>
+                                </div>
+                                <p class="text-xs text-blue-100/80 truncate mt-0.5">
+                                    Format lembar cetak evaluasi resmi Telkom AKI CAPEX • Siap diunduh dan ditandatangani
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" 
+                                    @click="downloadPreviewWord()" 
+                                    class="inline-flex items-center gap-1.5 bg-white text-blue-800 hover:bg-blue-50 text-xs font-semibold px-3.5 h-8 rounded-lg transition-colors shadow-xs">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span class="hidden sm:inline">Unduh Word (.docx)</span>
+                            </button>
+
+                            <button type="button" 
+                                    @click="wordPreviewOpen = false" 
+                                    class="text-blue-100 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Document Viewer: Realistic A4 Paper Preview --}}
+                    <div class="flex-1 overflow-auto bg-slate-200/80 p-4 sm:p-8 flex justify-center">
+                        <div class="w-full max-w-[21cm] bg-white shadow-xl border border-slate-300 p-6 sm:p-10 text-slate-900 font-sans text-xs leading-tight">
+                            
+                            {{-- Header Title Box --}}
+                            <div class="border-2 border-slate-900 py-2.5 px-4 text-center font-bold text-sm tracking-wide mb-3">
+                                HASIL EVALUASI AKI CAPEX &nbsp;PT. TELKOM &nbsp;TAHUN &nbsp;{{ date('Y') }}
+                            </div>
+
+                            {{-- Main Evaluation Table --}}
+                            <table class="w-full border-collapse border border-slate-900 text-xs mb-3">
+                                <tbody>
+                                    {{-- Section: Usulan Program PP --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="font-bold p-1.5 border-r border-slate-900 w-1/3">USULAN PROGRAM PP</td>
+                                        <td class="w-3 text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">ID Proposal</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Nama Program</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-medium">{{ $simulasi->nama_proyek }}</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Jumlah LOP</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">1</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">ID LOP (sesuai jumlah LOP)</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Lokasi / Site Program</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">{{ $simulasi->lokasi }}</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td rowspan="2" class="p-1.5 border-r border-slate-900 align-middle">Kapasitas</td>
+                                        <td class="p-1.5 border-r border-slate-900 text-right font-medium">VOLUME</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">1</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 text-right font-medium">SATUAN</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">Lokasi</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Penanggung Jawab</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Nomor Account</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td rowspan="2" class="p-1.5 border-r border-slate-900 align-middle">Nilai Program</td>
+                                        <td class="p-1.5 border-r border-slate-900 font-medium">CAPEX</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(result.capex_base || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 font-medium">BOP LAKWAS</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(result.bop || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Capex / Line</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900">Waktu Penyelesaian</td>
+                                        <td class="p-1.5 border-r border-slate-900 text-right">bulan</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">1</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Rencana Selesai</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">{{ date('Y') }}</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900">Masa kontrak/berlangganan</td>
+                                        <td class="p-1.5 border-r border-slate-900 text-right">tahun</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5" x-text="Math.floor((params.durasi_kontrak || 0)/12) + ' Tahun ' + ((params.durasi_kontrak || 0)%12) + ' Bulan'"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Pemilihan Teknologi</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">FO</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Usulan pola kemitraan</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5">-</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Alasan keberadaan proyek</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+
+                                    {{-- Section: Kinerja Bisnis (11 baris) --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td rowspan="11" class="p-1.5 border-r border-slate-900 font-bold align-middle w-1/4">
+                                            Kinerja Bisnis
+                                        </td>
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Estimasi Revenue</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(result.total_revenue || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Masa Kontrak / berlangganan</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="Math.floor((params.durasi_kontrak || 0)/12) + ' Tahun ' + ((params.durasi_kontrak || 0)%12) + ' Bulan atau ' + params.durasi_kontrak + ' Bulan'"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Nilai COGS / Direct Cost</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="Math.round(result.total_direct_cost || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Nilai Opex</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(sumField('opex')).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Gross Profit</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(result.total_gross_profit || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Gross Profit Margin</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="formatPct(result.gpm)"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Net Income</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(result.total_net_income || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Net Income Margin</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="formatPct(result.nim)"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">IRR</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="result.irr !== null ? ((result.irr * 100).toFixed(2).replace('.', ',') + '%') : 'N/A'"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">NPV</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="'Rp ' + Math.round(result.npv || 0).toLocaleString('id-ID')"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td class="p-1.5 border-r border-slate-900 italic text-right">Payback Periode</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 font-bold text-right" x-text="result.pbp !== null && result.pbp > 0 ? (Math.floor(result.pbp) + ' Tahun ' + Math.round((result.pbp % 1) * 12) + ' Bulan atau ' + Math.round(result.pbp * 12) + ' Bulan') : 'N/A'"></td>
+                                    </tr>
+
+                                    {{-- Section: Kriteria Investasi --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="font-bold p-1.5 border-r border-slate-900">
+                                            KRITERIA INVESTASI UNTUK PERIODE PEMAKAIAN
+                                        </td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5 text-center font-bold text-sm tracking-wider"
+                                            :class="result.layak ? 'bg-[#70AD47] text-white' : 'bg-[#ED7D31] text-white'"
+                                            x-text="result.layak ? 'LAYAK' : 'TIDAK LAYAK'"></td>
+                                    </tr>
+
+                                    {{-- Section: Catatan Penting --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="2" class="p-1.5 border-r border-slate-900">Catatan penting</td>
+                                        <td class="text-center border-r border-slate-900 p-1.5">:</td>
+                                        <td class="p-1.5"></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-900">
+                                        <td colspan="4" class="h-6 p-1.5"></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="4" class="h-6 p-1.5"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            {{-- Signature Block Table --}}
+                            <table class="w-full border-collapse border border-slate-900 text-center text-xs mt-4">
+                                <thead>
+                                    <tr class="border-b border-slate-900">
+                                        <th class="border-r border-slate-900 w-1/4 p-1.5 font-bold"></th>
+                                        <th class="border-r border-slate-900 w-2/5 p-1.5 font-bold">NAMA / NIK / JABATAN</th>
+                                        <th class="border-r border-slate-900 w-1/6 p-1.5 font-bold">TANGGAL</th>
+                                        <th class="p-1.5 font-bold w-1/6">TTD</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{-- DIBUAT OLEH --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td class="border-r border-slate-900 p-2 font-bold align-middle">DIBUAT OLEH</td>
+                                        <td class="border-r border-slate-900 p-3 bg-[#FFFF00] font-bold text-slate-900 leading-snug">
+                                            <div class="py-1">
+                                                <div>NIK.</div>
+                                                <div class="font-black">ACCOUNT MANAGER</div>
+                                            </div>
+                                        </td>
+                                        <td class="border-r border-slate-900 p-2"></td>
+                                        <td class="p-2"></td>
+                                    </tr>
+                                    {{-- DIPERIKSA OLEH - Manager Marketing --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td class="border-r border-slate-900 p-2 font-bold align-middle">DIPERIKSA OLEH</td>
+                                        <td class="border-r border-slate-900 p-3 bg-[#FFFF00] font-bold text-slate-900 leading-snug">
+                                            <div class="py-1">
+                                                <div>NIK.</div>
+                                                <div class="font-black">MANAGER MARKETING</div>
+                                            </div>
+                                        </td>
+                                        <td class="border-r border-slate-900 p-2"></td>
+                                        <td class="p-2"></td>
+                                    </tr>
+                                    {{-- DIPERIKSA OLEH - Mgr Access Design --}}
+                                    <tr class="border-b border-slate-900">
+                                        <td class="border-r border-slate-900 p-2 font-bold align-middle">DIPERIKSA OLEH</td>
+                                        <td class="border-r border-slate-900 p-3 bg-[#FFFF00] font-bold text-slate-900 leading-snug">
+                                            <div class="py-1">
+                                                <div>NIK.</div>
+                                                <div class="font-black">MGR ACCESS DESIGN & CAPEX MANAGEMENT II REGIONAL II</div>
+                                            </div>
+                                        </td>
+                                        <td class="border-r border-slate-900 p-2"></td>
+                                        <td class="p-2"></td>
+                                    </tr>
+                                    {{-- DISETUJUI OLEH --}}
+                                    <tr>
+                                        <td class="border-r border-slate-900 p-2 font-bold align-middle">DISETUJUI OLEH</td>
+                                        <td class="border-r border-slate-900 p-3 bg-[#FFFF00] font-bold text-slate-900 leading-snug">
+                                            <div class="py-1">
+                                                <div class="font-black">Dimas Syahputra</div>
+                                                <div>NIK. 80020</div>
+                                                <div class="font-black">MANAGER SOLUTION & OFFERING II REGIONAL II</div>
+                                            </div>
+                                        </td>
+                                        <td class="border-r border-slate-900 p-2"></td>
+                                        <td class="p-2"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- Modal Footer --}}
+                    <div class="bg-slate-50 border-t border-slate-200 px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span>Preview lembar evaluasi Word (.docx) siap cetak dan tandatangan.</span>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" 
+                                    @click="wordPreviewOpen = false" 
+                                    class="px-4 h-9 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-300 bg-white">
+                                Tutup Preview
+                            </button>
+
+                            <button type="button" 
+                                    @click="downloadPreviewWord()" 
+                                    class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-4 h-9 rounded-lg transition-colors border border-slate-300 shadow-xs">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Unduh .docx</span>
+                            </button>
+
+                            @if(in_array($simulasi->status, [\App\Models\SimulasiAki::STATUS_MENUNGGU_REVIEW, \App\Models\SimulasiAki::STATUS_LENGKAP_TERHITUNG]))
+                            <button type="button" 
+                                    @click="submitApproveFromModal()" 
+                                    class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 h-9 rounded-lg transition-colors shadow-xs">
+                                <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+                                <span>Sudah Sesuai & Setujui</span>
+                            </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
     </div>
 
     <script>
-    function mktCompleteForm(rdmOtcPct, rdmMrcPct, initialPrefix = 'show_mkt') {
+    function mktCompleteForm(rdmOtcPct, rdmMrcPct, initialPrefix = 'show_mkt', defaultOtcValue = 2500000) {
+        const initialWilayah = '{{ old('wilayah', $simulasi->input_json['wilayah'] ?? '') }}';
+        const initialPaket = '{{ old('paketisasi', $simulasi->paketisasi ?? '') }}';
+        const initialBw = '{{ old('bandwidth', $simulasi->bandwidth ?? '') }}';
+        const defaultOtcNum = Number(defaultOtcValue) || 2500000;
+        const savedOtc = {{ old('otc', $simulasi->input_json['otc'] ?? 'null') ?? 'null' }};
+        const initialOtc = (savedOtc !== null && savedOtc !== '' && Number(savedOtc) > 0) ? Number(savedOtc) : defaultOtcNum;
+        const savedNormal = {{ !empty($simulasi->input_json['wilayah']) ? (old('tarif_normal_mrc', $simulasi->input_json['tarif_normal_mrc'] ?? 0)) : 0 }};
+        const savedMrc = {{ !empty($simulasi->input_json['wilayah']) ? (old('mrc', $simulasi->mrc ?? ($simulasi->input_json['mrc'] ?? 0))) : 0 }};
+        const isCustomInit = (savedNormal > 0 && savedMrc > 0 && Math.abs(savedMrc - savedNormal) > 1);
+
         const initRaw = {
-            otc: {{ old('otc', $simulasi->input_json['otc'] ?? 0) }},
-            mrc: {{ old('mrc', $simulasi->input_json['mrc'] ?? 0) }},
+            otc: initialOtc,
+            mrc: savedMrc,
         };
 
         return {
             prefix: initialPrefix,
+            defaultOtc: defaultOtcNum,
             raw: { ...initRaw },
             display: Object.fromEntries(
                 Object.entries(initRaw).map(([k, v]) => [k, v === 0 ? '0' : Number(v).toLocaleString('id-ID')])
             ),
             rdmOtcPct: parseFloat(rdmOtcPct) || 0,
             rdmMrcPct: parseFloat(rdmMrcPct) || 0,
-            wilayah: '{{ old('wilayah', $simulasi->input_json['wilayah'] ?? '') }}',
-            tarifNormal: {{ old('tarif_normal_mrc', $simulasi->input_json['tarif_normal_mrc'] ?? 0) }},
-            foundPriceList: {{ isset($simulasi->input_json['tarif_normal_mrc']) && $simulasi->input_json['tarif_normal_mrc'] > 0 ? 'true' : 'false' }},
+            wilayah: initialWilayah,
+            tarifNormal: savedNormal,
+            updatedAt: '',
+            updatedAtHuman: '',
+            foundPriceList: {{ !empty($simulasi->input_json['wilayah']) && !empty($simulasi->input_json['tarif_normal_mrc']) ? 'true' : 'false' }},
+            lastProductKey: `${initialPaket}|${initialBw}|${initialWilayah}`,
+            userCustomizedMrc: isCustomInit,
 
             init() {
                 this.$nextTick(() => {
-                    this.lookupPrice();
+                    if (this.wilayah) {
+                        this.lookupPrice();
+                    }
                 });
+            },
+
+            handleFormChange(event) {
+                const targetName = event?.target?.name || '';
+                const targetId = event?.target?.id || '';
+
+                // Abaikan perubahan dari input mata uang atau field non-katalog
+                if (
+                    ['mrc', 'otc', 'mrc_display', 'otc_display', 'material', 'jasa', 'durasi_kontrak', 'bulan_tahun1'].includes(targetName) ||
+                    event?.target?.hasAttribute('data-currency')
+                ) {
+                    return;
+                }
+
+                // Hanya lakukan lookup jika elemen katalog produk yang berubah
+                const isProductSelector = ['paketisasi', 'wilayah', 'bandwidth'].includes(targetName) ||
+                    targetId.endsWith('_paketisasi') ||
+                    targetId.endsWith('_wilayah') ||
+                    targetId.endsWith('_bw_select') ||
+                    targetId.endsWith('_bw_custom');
+
+                if (isProductSelector) {
+                    this.lookupPrice(null, true);
+                }
             },
 
             get cogsOtc() {
@@ -1675,15 +2237,16 @@
                 return (this.raw.mrc || 0) - this.cogsStandar;
             },
             get sisaProfitPct() {
-                if (!this.raw.mrc || this.raw.mrc <= 0) return 0;
-                return ((this.sisaProfitNominal / this.raw.mrc) * 100).toFixed(1);
+                // Kalkulasi sisa margin: target/batas margin (misal 30%) dikurang persentase diskon harga asli
+                const sisa = (this.rdmMrcPct || 0) - (parseFloat(this.diskonPct) || 0);
+                return parseFloat(sisa.toFixed(1));
             },
             get isProfitDeficit() {
-                return this.tarifNormal > 0 && this.sisaProfitNominal < 0;
+                return this.tarifNormal > 0 && this.sisaProfitPct < 0;
             },
             get profitKeterangan() {
                 if (this.isProfitDeficit) {
-                    return 'Defisit Profit (Harga di bawah modal COGS)';
+                    return 'Defisit Margin Profit: ' + this.sisaProfitPct + '% (Target: ' + this.rdmMrcPct + '%)';
                 }
                 return 'Sisa Margin Profit: ' + this.sisaProfitPct + '% (Target: ' + this.rdmMrcPct + '%)';
             },
@@ -1692,16 +2255,44 @@
                 if (this.tarifNormal > 0) {
                     this.raw.mrc = this.tarifNormal;
                     this.display.mrc = this.tarifNormal.toLocaleString('id-ID');
+                    this.userCustomizedMrc = false;
                 }
             },
 
-            async lookupPrice(forceAutoFill = false) {
-                const elPaket = document.getElementById(this.prefix + '_paketisasi');
-                const elBwHidden = document.getElementById(this.prefix + '_bw_hidden');
-                const paket = elPaket ? elPaket.value : '';
-                const bw = elBwHidden ? elBwHidden.value : '';
+            async lookupPrice(preferredPrefix = null, forceAutoFill = false) {
+                if (typeof preferredPrefix === 'boolean') {
+                    forceAutoFill = preferredPrefix;
+                    preferredPrefix = null;
+                }
+                const pfx = preferredPrefix || this.prefix || 'show_mkt';
+                const elPaket = document.getElementById(pfx + '_paketisasi');
+                const elBwHidden = document.getElementById(pfx + '_bw_hidden');
+                const elBwSelect = document.getElementById(pfx + '_bw_select');
+                const elWilayah = document.getElementById(pfx + '_wilayah');
 
-                if (!paket || !bw) {
+                const paket = elPaket ? elPaket.value : '';
+                const bw = (elBwHidden && elBwHidden.value) ? elBwHidden.value : (elBwSelect ? elBwSelect.value : '');
+                const wil = (elWilayah && elWilayah.value) ? elWilayah.value : this.wilayah;
+
+                if (wil && this.wilayah !== wil) {
+                    this.wilayah = wil;
+                }
+
+                const currentProductKey = `${paket}|${bw}|${this.wilayah}`;
+                const productChanged = Boolean(this.lastProductKey && this.lastProductKey !== currentProductKey);
+                this.lastProductKey = currentProductKey;
+
+                // Syarat: Paket, Bandwidth, dan Wilayah harus dipilih terlebih dahulu
+                if (!paket || !bw || !this.wilayah) {
+                    const previousNormal = this.tarifNormal;
+                    this.tarifNormal = 0;
+                    this.updatedAt = '';
+                    this.updatedAtHuman = '';
+                    this.foundPriceList = false;
+                    if (!this.wilayah && (forceAutoFill || (previousNormal > 0 && this.raw.mrc === previousNormal))) {
+                        this.raw.mrc = 0;
+                        this.display.mrc = '0';
+                    }
                     return;
                 }
 
@@ -1709,7 +2300,7 @@
                     const params = new URLSearchParams({
                         paket: paket,
                         bandwidth: bw,
-                        wilayah: this.wilayah || ''
+                        wilayah: this.wilayah
                     });
                     const res = await fetch(`/api/price-list/lookup?${params.toString()}`, {
                         headers: {
@@ -1722,19 +2313,31 @@
                     if (data.found) {
                         const previousNormal = this.tarifNormal;
                         this.tarifNormal = data.tarif_normal_mrc;
+                        this.updatedAt = data.updated_at || '';
+                        this.updatedAtHuman = data.updated_at_human || '';
                         this.foundPriceList = true;
 
-                        // Otomatis ubah nilai Tarif MRC jika:
-                        // 1. Field masih kosong atau 0
-                        // 2. ATAU nilai sebelumnya persis sama dengan tarif normal lama (artinya user ganti paket/bw/wilayah)
-                        // 3. ATAU forceAutoFill = true
-                        if (forceAutoFill || !this.raw.mrc || this.raw.mrc === 0 || this.raw.mrc === previousNormal) {
+                        // Perbarui nilai Tarif MRC HANYA JIKA:
+                        // 1. Nilai MRC saat ini masih kosong / 0
+                        // 2. ATAU nilai MRC sebelumnya persis sama dengan tarif normal lama (user tidak menetapkan custom diskon)
+                        // 3. ATAU produk sengaja diubah oleh user (productChanged)
+                        // PENTING: Jika user sudah mengetik harga custom / diskon (userCustomizedMrc === true) dan produk TIDAK berubah,
+                        // JANGAN PERNAH menimpa harga custom tersebut saat blur / klik luar kotak!
+                        const isMrcEmpty = (!this.raw.mrc || this.raw.mrc === 0);
+                        const wasCatalogPrice = (previousNormal > 0 && this.raw.mrc === previousNormal);
+
+                        if (isMrcEmpty || wasCatalogPrice || productChanged) {
                             this.raw.mrc = data.tarif_normal_mrc;
                             this.display.mrc = data.tarif_normal_mrc.toLocaleString('id-ID');
+                            if (productChanged) {
+                                this.userCustomizedMrc = false;
+                            }
                         }
                     } else {
                         this.foundPriceList = false;
                         this.tarifNormal = 0;
+                        this.updatedAt = '';
+                        this.updatedAtHuman = '';
                     }
                 } catch (e) {
                     console.error('Error saat lookup katalog price list:', e);
@@ -1745,10 +2348,20 @@
                 let digits = event.target.value.replace(/\D/g, '');
                 let num = parseInt(digits, 10) || 0;
                 this.raw[field] = num;
-                this.display[field] = num.toLocaleString('id-ID');
+                this.display[field] = digits === '' ? '' : num.toLocaleString('id-ID');
+                if (field === 'mrc') {
+                    this.userCustomizedMrc = (this.tarifNormal > 0 ? (num !== this.tarifNormal) : true);
+                }
                 this.$nextTick(() => {
                     event.target.value = this.display[field];
                 });
+            },
+            handleBlur(event, field) {
+                if (!this.display[field] || this.display[field] === '') {
+                    this.raw[field] = 0;
+                    this.display[field] = '0';
+                    event.target.value = '0';
+                }
             },
             selectAll(event) {
                 event.target.select();
@@ -1834,6 +2447,8 @@
             result: @json($initialResult),
             loading: false,
             error: null,
+            showReject: false,
+            catatanRevisi: '',
 
             // Excel Preview State
             previewOpen: false,
@@ -1845,6 +2460,13 @@
             sheets: {},
             sheetNames: [],
             activeSheet: '6. Resume',
+
+            // Word Preview State
+            wordPreviewOpen: false,
+            wordPreviewLoading: false,
+            wordPreviewError: null,
+            wordPreviewBlob: null,
+            wordPreviewFilename: 'Preview_Evaluasi_AKI_{{ addslashes($simulasi->nama_proyek) }}.docx',
 
             async recalculate() {
                 this.loading = true;
@@ -1864,6 +2486,7 @@
                         throw new Error(err.error || err.message || 'Gagal menghitung.');
                     }
                     this.result = await res.json();
+                    window.dispatchEvent(new CustomEvent('simulation-recalculated', { detail: this.result }));
                     this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
                 } catch (e) {
                     this.error = e.message;
@@ -1946,6 +2569,80 @@
                 a.click();
                 a.remove();
                 setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+            },
+
+            async openWordPreview() {
+                this.wordPreviewLoading = true;
+                this.wordPreviewError = null;
+                try {
+                    if (!this.result || !this.result.rows || this.result.rows.length === 0) {
+                        await this.recalculate();
+                    }
+
+                    const res = await fetch('{{ route("simulasi.previewWord", $simulasi) }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/json',
+                        },
+                        body: JSON.stringify(this.params),
+                    });
+
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        this.wordPreviewBlob = blob;
+                    }
+
+                    this.wordPreviewOpen = true;
+                    this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+                } catch (e) {
+                    this.wordPreviewError = e.message;
+                    alert('Gagal memuat preview Word: ' + e.message);
+                } finally {
+                    this.wordPreviewLoading = false;
+                }
+            },
+
+            downloadPreviewWord() {
+                if (!this.wordPreviewBlob) {
+                    window.location.href = '{{ route("simulasi.previewWord", $simulasi) }}';
+                    return;
+                }
+                const url = window.URL.createObjectURL(this.wordPreviewBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = this.wordPreviewFilename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+            },
+
+            applyGoalSeekCatatan(type) {
+                if (!this.result || !this.result.goal_seek) return;
+                const gs = this.result.goal_seek;
+                let text = '';
+                if (type === 'mrc' && gs.min_mrc) {
+                    text = `Rekomendasi RSO (Goal Seek): Mohon sesuaikan tarif bulanan (MRC) minimal menjadi Rp ${this.formatRp(gs.min_mrc)} (naik Rp ${this.formatRp(gs.delta_mrc)} dari saat ini) agar proyek mencapai batas kelayakan investasi.`;
+                } else if (type === 'durasi' && gs.min_durasi) {
+                    text = `Rekomendasi RSO (Goal Seek): Mohon perpanjang durasi kontrak minimal menjadi ${gs.min_durasi} bulan (+${gs.delta_durasi} bulan dari durasi saat ini) agar proyek mencapai batas kelayakan investasi.`;
+                } else if (type === 'capex' && gs.max_capex) {
+                    text = `Rekomendasi RSO (Goal Seek): Mohon koordinasikan efisiensi biaya CAPEX ke nilai maksimal Rp ${this.formatRp(gs.max_capex)} (pengurangan Rp ${this.formatRp(gs.delta_capex)} dari total CAPEX saat ini) agar proyek layak investasi.`;
+                }
+
+                if (text) {
+                    this.catatanRevisi = text;
+                    this.showReject = true;
+                    this.$nextTick(() => {
+                        const el = document.getElementById('textarea_catatan_revisi');
+                        if (el) {
+                            el.focus();
+                            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                        if (window.lucide) lucide.createIcons();
+                    });
+                }
             },
 
             submitApproveFromModal() {

@@ -138,9 +138,16 @@ def calculate_aki(p: dict) -> dict:
   irr_val = float(npf.mirr(fcf_list, wacc, 0.07)) if (has_pos and has_neg) else None
 
   if len(cum_fcf) >= 2 and cum_fcf[-1] >= 0:
-    t_years = list(range(1, num_years + 1))
-    _, intercept, _, _, _ = stats.linregress(cum_fcf, t_years)
-    pbp = max(0.0, float(intercept))
+    # Cek variansi cum_fcf untuk mencegah crash SciPy linregress jika nilai identik (variance = 0)
+    if float(np.var(cum_fcf)) > 1e-9:
+      try:
+        t_years = list(range(1, num_years + 1))
+        _, intercept, _, _, _ = stats.linregress(cum_fcf, t_years)
+        pbp = max(0.0, float(intercept)) if not np.isnan(intercept) else 0.0
+      except Exception:
+        pbp = 0.0 if cum_fcf[0] >= 0 else None
+    else:
+      pbp = 0.0 if cum_fcf[0] >= 0 else None
   else:
     pbp = None
 
@@ -151,9 +158,10 @@ def calculate_aki(p: dict) -> dict:
   gpm = (total_gp / total_rev * 100) if total_rev > 0 else 0
   nim = (total_ni / total_rev * 100) if total_rev > 0 else 0
 
+  all_pos_cashflow = all(f >= 0 for f in fcf_list) and npv_val > 0
   layak = (
       (npv_val > 0)
-      and (irr_val is not None and irr_val > (wacc + 0.02))
+      and ((irr_val is not None and irr_val > (wacc + 0.02)) or all_pos_cashflow)
       and (gpm >= 7.0)
       and (nim >= 2.0)
   )
@@ -175,6 +183,7 @@ def calculate_aki(p: dict) -> dict:
       "pbp": pbp,
       "layak": layak,
       "fcf_list": fcf_list,
+      "cum_fcf": [float(x) for x in cum_fcf],
   }
 
 
@@ -193,9 +202,13 @@ def goal_seek_aki(p: dict) -> dict:
     return {"needed": False, "message": "Simulasi sudah LAYAK, tidak perlu penyesuaian."}
 
   results = {"needed": True}
+  base_capex_total = float(p.get("material", 0) + p.get("jasa", 0))
 
   # --- a) Minimal MRC ---
-  lo, hi = float(p["mrc"]), float(p["mrc"]) * 50 + 1_000_000
+  # Jika MRC awal 0 atau kecil, rentang hi harus cukup besar berdasarkan CAPEX
+  base_mrc = float(p.get("mrc", 0))
+  hi_mrc = max(base_mrc * 50 + 10_000_000, (base_capex_total * 0.20) + 50_000_000)
+  lo, hi = base_mrc, hi_mrc
   best_mrc = None
   for _ in range(80):
     mid = (lo + hi) / 2
@@ -209,27 +222,14 @@ def goal_seek_aki(p: dict) -> dict:
     if hi - lo < 1:
       break
   results["min_mrc"] = round(best_mrc, 0) if best_mrc else None
-  results["delta_mrc"] = round(best_mrc - p["mrc"], 0) if best_mrc else None
+  results["delta_mrc"] = round(best_mrc - base_mrc, 0) if best_mrc else None
 
-  # --- b) Minimal OTC ---
-  lo, hi = float(p["otc"]), float(p["otc"]) * 50 + 10_000_000
-  best_otc = None
-  for _ in range(80):
-    mid = (lo + hi) / 2
-    trial = dict(p, otc=mid)
-    r = calculate_aki(trial)
-    if r["layak"]:
-      best_otc = mid
-      hi = mid
-    else:
-      lo = mid
-    if hi - lo < 1:
-      break
-  results["min_otc"] = round(best_otc, 0) if best_otc else None
-  results["delta_otc"] = round(best_otc - p["otc"], 0) if best_otc else None
+  # --- b) Minimal OTC (Dinonaktifkan: tarif OTC merupakan template standar perusahaan) ---
+  results["min_otc"] = None
+  results["delta_otc"] = None
 
   # --- c) Maksimal CAPEX (material+jasa) ---
-  total_capex = float(p["material"] + p["jasa"])
+  total_capex = base_capex_total
   if total_capex > 0:
     lo, hi = 0.0, total_capex
     best_capex = None
@@ -268,19 +268,33 @@ def goal_seek_aki(p: dict) -> dict:
 # ========================= EXCEL EXPORT (MULTI-SHEET) =========================
 # Sama persis dengan builder yang sudah diverifikasi via LibreOffice
 # recalculation (0 formula error, NPV/MIRR/PBP cocok dgn Excel referensi).
-def _year_headers(ws, row, start_col_idx=3):
-  for i in range(5):
+def _clean_cell_str(val: any) -> str:
+  s = str(val if val is not None else "")
+  if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+    return "'" + s
+  return s
+
+
+def _year_headers(ws, row, year_cols, tot_col, start_col_idx=3):
+  for i, col in enumerate(year_cols):
     c = ws.cell(row=row, column=start_col_idx + i, value=f"Tahun {i+1}")
     c.font, c.fill, c.border = BOLD, HFILL, THIN
     c.alignment = Alignment(horizontal="center")
-  c = ws.cell(row=row, column=start_col_idx + 5, value="TOTAL")
+  c = ws.cell(row=row, column=start_col_idx + len(year_cols), value="TOTAL")
   c.font, c.fill, c.border = BOLD, HFILL, THIN
 
 
 def build_workbook(p: dict) -> openpyxl.Workbook:
   months = p["months"]
   n_years = len(months)
-  padded_months = months + [0] * (5 - n_years)
+  num_excel_years = max(5, n_years)
+  padded_months = months + [0] * (num_excel_years - n_years)
+
+  # Dinamis: buat kolom tahun (C, D, E, F, G, ...) dan kolom TOTAL
+  YEAR_COLS = [get_column_letter(3 + i) for i in range(num_excel_years)]
+  TOT_COL = get_column_letter(3 + num_excel_years)
+  FIRST_COL = YEAR_COLS[0]
+  LAST_COL = YEAR_COLS[-1]
 
   wb = openpyxl.Workbook()
   wb.remove(wb.active)
@@ -288,8 +302,8 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   # ---- 1. Cover ----
   ws = wb.create_sheet("1. Cover")
   ws["B2"] = "SIMULASI & EVALUASI AKI / CAPEX"; ws["B2"].font = TITLE
-  ws["B4"] = "Nama Proyek"; ws["C4"] = p["nama_proyek"]
-  ws["B5"] = "Lokasi"; ws["C5"] = p.get("lokasi", "")
+  ws["B4"] = "Nama Proyek"; ws["C4"] = _clean_cell_str(p["nama_proyek"])
+  ws["B5"] = "Lokasi"; ws["C5"] = _clean_cell_str(p.get("lokasi", ""))
   ws["B6"] = "Durasi Kontrak (Bulan)"; ws["C6"] = sum(months)
   ws["B7"] = "WACC"; ws["C7"] = p["wacc_pct"] / 100.0; ws["C7"].number_format = "0.00%"
   for r in (4, 5, 6, 7):
@@ -299,13 +313,13 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   # ---- 2. Rev ----
   ws = wb.create_sheet("2. Rev")
   ws["B1"] = "PERHITUNGAN REVENUE"; ws["B1"].font = TITLE
-  ws["B2"] = "Nama Proyek"; ws["C2"] = f": {p['nama_proyek']}"
-  _year_headers(ws, 4)
+  ws["B2"] = "Nama Proyek"; ws["C2"] = f": {_clean_cell_str(p['nama_proyek'])}"
+  _year_headers(ws, 4, YEAR_COLS, TOT_COL)
   ws["B4"] = "DESKRIPSI"; ws["B4"].font, ws["B4"].fill, ws["B4"].border = BOLD, HFILL, THIN
   ws["B5"] = "Jumlah Bulan"
   for i, col in enumerate(YEAR_COLS):
     cell = ws[f"{col}5"]; cell.value = padded_months[i]; cell.font = BLUE; cell.border = THIN
-  ws["H5"] = "=SUM(C5:G5)"; ws["H5"].font = BOLD
+  ws[f"{TOT_COL}5"] = f"=SUM({FIRST_COL}5:{LAST_COL}5)"; ws[f"{TOT_COL}5"].font = BOLD
   ws["B6"] = "Tarif OTC / Pasang Baru (Rp)"
   ws["C6"] = p["otc"]; ws["C6"].font = BLUE; ws["C6"].number_format = "#,##0"
   for col in YEAR_COLS[1:]:
@@ -323,23 +337,23 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B10"] = "TOTAL REVENUE"; ws["B10"].font = BOLD
   for col in YEAR_COLS:
     c = ws[f"{col}10"]; c.value = f"={col}8+{col}9"; c.font = BOLD; c.number_format = "#,##0"
-  ws["H10"] = "=SUM(C10:G10)"; ws["H10"].font = BOLD; ws["H10"].number_format = "#,##0"
+  ws[f"{TOT_COL}10"] = f"=SUM({FIRST_COL}10:{LAST_COL}10)"; ws[f"{TOT_COL}10"].font = BOLD; ws[f"{TOT_COL}10"].number_format = "#,##0"
   for r in range(6, 11):
-    for col in YEAR_COLS + ["H"]:
+    for col in YEAR_COLS + [TOT_COL]:
       ws[f"{col}{r}"].border = THIN
   ws.column_dimensions["B"].width = 32
-  for col in YEAR_COLS + ["H"]:
+  for col in YEAR_COLS + [TOT_COL]:
     ws.column_dimensions[col].width = 15
 
   # ---- 4. Dir ----
   ws = wb.create_sheet("4. Dir")
   ws["B1"] = "PERHITUNGAN DIRECT COST"; ws["B1"].font = TITLE
-  _year_headers(ws, 4)
+  _year_headers(ws, 4, YEAR_COLS, TOT_COL)
   ws["B4"] = "DESKRIPSI"; ws["B4"].font, ws["B4"].fill, ws["B4"].border = BOLD, HFILL, THIN
   ws["B5"] = "Jumlah Bulan"
   for col in YEAR_COLS:
     ws[f"{col}5"] = f"='2. Rev'!{col}5"
-  ws["H5"] = "=SUM(C5:G5)"
+  ws[f"{TOT_COL}5"] = f"=SUM({FIRST_COL}5:{LAST_COL}5)"
   ws["B6"] = "COGS Direct Cost OTC (Rp)"
   ws["C6"] = p["cogs_install"]; ws["C6"].font = BLUE; ws["C6"].number_format = "#,##0"
   for col in YEAR_COLS[1:]:
@@ -357,12 +371,12 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B10"] = "TOTAL DIRECT COST"; ws["B10"].font = BOLD
   for col in YEAR_COLS:
     c = ws[f"{col}10"]; c.value = f"={col}8+{col}9"; c.font = BOLD; c.number_format = "#,##0"
-  ws["H10"] = "=SUM(C10:G10)"; ws["H10"].font = BOLD; ws["H10"].number_format = "#,##0"
+  ws[f"{TOT_COL}10"] = f"=SUM({FIRST_COL}10:{LAST_COL}10)"; ws[f"{TOT_COL}10"].font = BOLD; ws[f"{TOT_COL}10"].number_format = "#,##0"
   for r in range(5, 11):
-    for col in YEAR_COLS + ["H"]:
+    for col in YEAR_COLS + [TOT_COL]:
       ws[f"{col}{r}"].border = THIN
   ws.column_dimensions["B"].width = 32
-  for col in YEAR_COLS + ["H"]:
+  for col in YEAR_COLS + [TOT_COL]:
     ws.column_dimensions[col].width = 15
 
   # ---- 3. Cpx ----
@@ -383,12 +397,12 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B11"] = "Depresiasi per Bulan (Rp)"; ws["C11"] = "=C8/C10"; ws["C11"].number_format = "#,##0"
   for r in range(3, 12):
     ws[f"B{r}"].border = THIN; ws[f"C{r}"].border = THIN
-  _year_headers(ws, 13)
+  _year_headers(ws, 13, YEAR_COLS, TOT_COL)
   ws["B13"] = "DESKRIPSI"; ws["B13"].font, ws["B13"].fill, ws["B13"].border = BOLD, HFILL, THIN
   ws["B14"] = "Jumlah Bulan"
   for col in YEAR_COLS:
     ws[f"{col}14"] = f"='2. Rev'!{col}5"
-  ws["H14"] = "=SUM(C14:G14)"
+  ws[f"{TOT_COL}14"] = f"=SUM({FIRST_COL}14:{LAST_COL}14)"
   ws["B15"] = "Akumulasi Depresiasi (Awal Tahun)"; ws["C15"] = 0
   prev = "C"
   for col in YEAR_COLS[1:]:
@@ -397,14 +411,14 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   for col in YEAR_COLS:
     ws[f"{col}16"] = f"=MIN($C$11*{col}14,$C$8-{col}15)"
     ws[f"{col}16"].number_format = "#,##0"
-  ws["H16"] = "=SUM(C16:G16)"
+  ws[f"{TOT_COL}16"] = f"=SUM({FIRST_COL}16:{LAST_COL}16)"
   ws["B17"] = "TOTAL DEPRESIASI"; ws["B17"].font = BOLD
-  ws["H17"] = "=H16"; ws["H17"].font = BOLD; ws["H17"].number_format = "#,##0"
+  ws[f"{TOT_COL}17"] = f"={TOT_COL}16"; ws[f"{TOT_COL}17"].font = BOLD; ws[f"{TOT_COL}17"].number_format = "#,##0"
   for r in range(14, 17):
-    for col in YEAR_COLS + ["H"]:
+    for col in YEAR_COLS + [TOT_COL]:
       ws[f"{col}{r}"].border = THIN
   ws.column_dimensions["B"].width = 34
-  for col in YEAR_COLS + ["H"]:
+  for col in YEAR_COLS + [TOT_COL]:
     ws.column_dimensions[col].width = 15
 
   # ---- 5. Opx ----
@@ -416,27 +430,27 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B5"] = "O&M per Bulan (Rp)"; ws["C5"] = "=(C4*C3)/12"; ws["C5"].number_format = "#,##0"
   for r in range(3, 6):
     ws[f"B{r}"].border = THIN; ws[f"C{r}"].border = THIN
-  _year_headers(ws, 7)
+  _year_headers(ws, 7, YEAR_COLS, TOT_COL)
   ws["B7"] = "DESKRIPSI"; ws["B7"].font, ws["B7"].fill, ws["B7"].border = BOLD, HFILL, THIN
   ws["B8"] = "Jumlah Bulan"
   for col in YEAR_COLS:
     ws[f"{col}8"] = f"='2. Rev'!{col}5"
-  ws["H8"] = "=SUM(C8:G8)"
+  ws[f"{TOT_COL}8"] = f"=SUM({FIRST_COL}8:{LAST_COL}8)"
   ws["B9"] = "OPEX (O&M) Tahun Berjalan"; ws["B9"].font = BOLD
   for col in YEAR_COLS:
     c = ws[f"{col}9"]; c.value = f"=$C$5*{col}8"; c.font = BOLD; c.number_format = "#,##0"
-  ws["H9"] = "=SUM(C9:G9)"; ws["H9"].font = BOLD; ws["H9"].number_format = "#,##0"
+  ws[f"{TOT_COL}9"] = f"=SUM({FIRST_COL}9:{LAST_COL}9)"; ws[f"{TOT_COL}9"].font = BOLD; ws[f"{TOT_COL}9"].number_format = "#,##0"
   for r in (8, 9):
-    for col in YEAR_COLS + ["H"]:
+    for col in YEAR_COLS + [TOT_COL]:
       ws[f"{col}{r}"].border = THIN
   ws.column_dimensions["B"].width = 32
-  for col in YEAR_COLS + ["H"]:
+  for col in YEAR_COLS + [TOT_COL]:
     ws.column_dimensions[col].width = 15
 
   # ---- COM ----
   ws = wb.create_sheet("COM")
   ws["B1"] = "EVALUATION FORM / FEASIBILITY CALCULATION"; ws["B1"].font = TITLE
-  _year_headers(ws, 3)
+  _year_headers(ws, 3, YEAR_COLS, TOT_COL)
   ws["B3"] = "DESKRIPSI"; ws["B3"].font, ws["B3"].fill, ws["B3"].border = BOLD, HFILL, THIN
   ws["B4"] = "Jumlah Bulan"
   for col in YEAR_COLS:
@@ -444,44 +458,44 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B5"] = "REVENUE"
   for col in YEAR_COLS:
     ws[f"{col}5"] = f"='2. Rev'!{col}10"
-  ws["H5"] = "=SUM(C5:G5)"
+  ws[f"{TOT_COL}5"] = f"=SUM({FIRST_COL}5:{LAST_COL}5)"
   ws["B6"] = "DIRECT COST"
   for col in YEAR_COLS:
     ws[f"{col}6"] = f"='4. Dir'!{col}10"
-  ws["H6"] = "=SUM(C6:G6)"
+  ws[f"{TOT_COL}6"] = f"=SUM({FIRST_COL}6:{LAST_COL}6)"
   ws["B7"] = "GROSS PROFIT"; ws["B7"].font = BOLD
   for col in YEAR_COLS:
     ws[f"{col}7"] = f"={col}5-{col}6"
-  ws["H7"] = "=SUM(C7:G7)"; ws["H7"].font = BOLD
-  ws["B8"] = "GPM"; ws["H8"] = "=IFERROR(H7/H5,0)"; ws["H8"].number_format = "0.00%"
+  ws[f"{TOT_COL}7"] = f"=SUM({FIRST_COL}7:{LAST_COL}7)"; ws[f"{TOT_COL}7"].font = BOLD
+  ws["B8"] = "GPM"; ws[f"{TOT_COL}8"] = f"=IFERROR({TOT_COL}7/{TOT_COL}5,0)"; ws[f"{TOT_COL}8"].number_format = "0.00%"
   ws["B9"] = "OPEX (O&M)"
   for col in YEAR_COLS:
     ws[f"{col}9"] = f"='5. Opx'!{col}9"
-  ws["H9"] = "=SUM(C9:G9)"
+  ws[f"{TOT_COL}9"] = f"=SUM({FIRST_COL}9:{LAST_COL}9)"
   ws["B10"] = "EBITDA"
   for col in YEAR_COLS:
     ws[f"{col}10"] = f"={col}7-{col}9"
-  ws["H10"] = "=SUM(C10:G10)"
+  ws[f"{TOT_COL}10"] = f"=SUM({FIRST_COL}10:{LAST_COL}10)"
   ws["B11"] = "DEPRESIASI"
   for col in YEAR_COLS:
     ws[f"{col}11"] = f"='3. Cpx'!{col}16"
-  ws["H11"] = "=SUM(C11:G11)"
+  ws[f"{TOT_COL}11"] = f"=SUM({FIRST_COL}11:{LAST_COL}11)"
   ws["B12"] = "EBIT"; ws["B12"].font = BOLD
   for col in YEAR_COLS:
     ws[f"{col}12"] = f"={col}10-{col}11"
-  ws["H12"] = "=SUM(C12:G12)"; ws["H12"].font = BOLD
-  ws["B13"] = "EBIT MARGIN"; ws["H13"] = "=IFERROR(H12/H5,0)"; ws["H13"].number_format = "0.00%"
+  ws[f"{TOT_COL}12"] = f"=SUM({FIRST_COL}12:{LAST_COL}12)"; ws[f"{TOT_COL}12"].font = BOLD
+  ws["B13"] = "EBIT MARGIN"; ws[f"{TOT_COL}13"] = f"=IFERROR({TOT_COL}12/{TOT_COL}5,0)"; ws[f"{TOT_COL}13"].number_format = "0.00%"
   ws["B15"] = "Tarif Pajak Perusahaan (%)"
   ws["C15"] = p["tax_pct"] / 100.0; ws["C15"].font = BLUE; ws["C15"].number_format = "0.00%"
   ws["B16"] = "PAJAK"
   for col in YEAR_COLS:
     ws[f"{col}16"] = f"={col}12*$C$15"
-  ws["H16"] = "=SUM(C16:G16)"
+  ws[f"{TOT_COL}16"] = f"=SUM({FIRST_COL}16:{LAST_COL}16)"
   ws["B17"] = "NET INCOME"; ws["B17"].font = BOLD
   for col in YEAR_COLS:
     c = ws[f"{col}17"]; c.value = f"={col}12-{col}16"; c.font = BOLD
-  ws["H17"] = "=SUM(C17:G17)"; ws["H17"].font = BOLD
-  ws["B18"] = "NI MARGIN (NIM)"; ws["H18"] = "=IFERROR(H17/H5,0)"; ws["H18"].number_format = "0.00%"
+  ws[f"{TOT_COL}17"] = f"=SUM({FIRST_COL}17:{LAST_COL}17)"; ws[f"{TOT_COL}17"].font = BOLD
+  ws["B18"] = "NI MARGIN (NIM)"; ws[f"{TOT_COL}18"] = f"=IFERROR({TOT_COL}17/{TOT_COL}5,0)"; ws[f"{TOT_COL}18"].number_format = "0.00%"
   ws["B20"] = "Working Capital Assumptions"; ws["B20"].font = BOLD
   ws["B21"] = "Account Receivable (Hari)"; ws["C21"] = 60; ws["C21"].font = BLUE
   ws["B22"] = "Account Payable (Hari)"; ws["C22"] = 60; ws["C22"].font = BLUE
@@ -522,28 +536,28 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B37"] = "PV Free Cash Flow"
   for col in YEAR_COLS:
     ws[f"{col}37"] = f"={col}32*{col}36"
-  ws["H37"] = "=SUM(C37:G37)"
+  ws[f"{TOT_COL}37"] = f"=SUM({FIRST_COL}37:{LAST_COL}37)"
   ws["B39"] = "NET PRESENT VALUE (NPV)"; ws["B39"].font = BOLD
-  ws["C39"] = "=SUM(C37:G37)"; ws["C39"].font = BOLD; ws["C39"].number_format = "#,##0"
+  ws["C39"] = f"=SUM({FIRST_COL}37:{LAST_COL}37)"; ws["C39"].font = BOLD; ws["C39"].number_format = "#,##0"
   ws["B40"] = "Reinvestment Rate (utk MIRR)"
   ws["C40"] = 0.07; ws["C40"].font = BLUE; ws["C40"].number_format = "0.00%"
   ws["B41"] = "MIRR"; ws["B41"].font = BOLD
-  ws["C41"] = "=MIRR(C32:G32,$C$34,$C$40)"; ws["C41"].font = BOLD; ws["C41"].number_format = "0.00%"
+  ws["C41"] = f"=MIRR({FIRST_COL}32:{LAST_COL}32,$C$34,$C$40)"; ws["C41"].font = BOLD; ws["C41"].number_format = "0.00%"
   ws["B43"] = "Akumulasi FCF"; ws["C43"] = "=C32"
   prev = "C"
   for col in YEAR_COLS[1:]:
     ws[f"{col}43"] = f"={prev}43+{col}32"; prev = col
   ws["B44"] = "PAYBACK PERIOD (Tahun)"; ws["B44"].font = BOLD
-  ws["C44"] = "=INTERCEPT(C35:G35,C43:G43)"; ws["C44"].font = BOLD; ws["C44"].number_format = "0.00"
+  ws["C44"] = f"=INTERCEPT({FIRST_COL}35:{LAST_COL}35,{FIRST_COL}43:{LAST_COL}43)"; ws["C44"].font = BOLD; ws["C44"].number_format = "0.00"
   ws["B47"] = "KRITERIA KELAYAKAN"; ws["B47"].font = BOLD
   ws["B48"] = "Verdict"
   ws["C48"] = (
-      '=IF(AND(C39>0,C41>($C$34+0.02),H8>=0.07,H18>=0.02),'
+      f'=IF(AND(C39>0,C41>($C$34+0.02),{TOT_COL}8>=0.07,{TOT_COL}18>=0.02),'
       '"LAYAK INVESTASI","TIDAK LAYAK INVESTASI")'
   )
   ws["C48"].font = BOLD
   ws.column_dimensions["B"].width = 34
-  for col in YEAR_COLS + ["H"]:
+  for col in YEAR_COLS + [TOT_COL]:
     ws.column_dimensions[col].width = 15
 
   # ---- 6. Resume ----
@@ -551,7 +565,7 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
   ws["B2"] = "Nama Project"; ws["B2"].font = TITLE
   ws["C2"] = ": Pengadaan Layanan Internet"; ws["C2"].font = TITLE
   ws["B3"] = "Nama Pelanggan"; ws["B3"].font = TITLE
-  ws["C3"] = f": {p['nama_proyek']}"; ws["C3"].font = TITLE
+  ws["C3"] = f": {_clean_cell_str(p['nama_proyek'])}"; ws["C3"].font = TITLE
   ws["B4"] = "Durasi Kontrak"; ws["B4"].font = TITLE
   tot_m = sum(months)
   ws["C4"] = f": {tot_m // 12} Tahun {tot_m % 12} Bulan"; ws["C4"].font = TITLE
@@ -561,8 +575,8 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
     col = get_column_letter(2 + i)
     c = ws[f"{col}6"]; c.value = h; c.font = BOLD; c.fill = HFILL; c.border = THIN
     c.alignment = Alignment(horizontal="center")
-  formula_map = ["=COM!H5", "=COM!H6", "=COM!H7", "=COM!H8", "=COM!H17",
-                 "=COM!H18", "=COM!C39", "=COM!C41", "=COM!C44"]
+  formula_map = [f"=COM!{TOT_COL}5", f"=COM!{TOT_COL}6", f"=COM!{TOT_COL}7", f"=COM!{TOT_COL}8", f"=COM!{TOT_COL}17",
+                 f"=COM!{TOT_COL}18", "=COM!C39", "=COM!C41", "=COM!C44"]
   fmt_map = ["#,##0", "#,##0", "#,##0", "0.00%", "#,##0", "0.00%", "#,##0", "0.00%", "0.00"]
   for i, (f, fmt) in enumerate(zip(formula_map, fmt_map)):
     col = get_column_letter(2 + i)
@@ -570,20 +584,19 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
     c.alignment = Alignment(horizontal="right")
 
   ws["B9"] = "Analisa Kelayakan Investasi (dalam Rp, kecuali angka persentase)"; ws["B9"].font = TITLE
-  for i in range(5):
-    col = get_column_letter(3 + i)
+  for i, col in enumerate(YEAR_COLS):
     c = ws[f"{col}10"]; c.value = f"Tahun {i+1}"; c.font = BOLD; c.fill = HFILL; c.border = THIN
     c.alignment = Alignment(horizontal="center")
-  ws["H10"] = "TOTAL"; ws["H10"].font = BOLD; ws["H10"].fill = HFILL; ws["H10"].border = THIN
+  ws[f"{TOT_COL}10"] = "TOTAL"; ws[f"{TOT_COL}10"].font = BOLD; ws[f"{TOT_COL}10"].fill = HFILL; ws[f"{TOT_COL}10"].border = THIN
 
   pl_rows = [
-      (11, "Revenue", "COM!{c}5", "COM!H5", "#,##0"),
-      (12, "Direct Cost", "COM!{c}6", "COM!H6", "#,##0"),
-      (13, "Gross Margin", "COM!{c}7", "COM!H7", "#,##0"),
-      (15, "OPEX (O&M)", "COM!{c}9", "COM!H9", "#,##0"),
-      (16, "Depresiasi", "COM!{c}11", "COM!H11", "#,##0"),
-      (17, "Tax", "COM!{c}16", "COM!H16", "#,##0"),
-      (18, "Net Income", "COM!{c}17", "COM!H17", "#,##0"),
+      (11, "Revenue", "COM!{c}5", f"COM!{TOT_COL}5", "#,##0"),
+      (12, "Direct Cost", "COM!{c}6", f"COM!{TOT_COL}6", "#,##0"),
+      (13, "Gross Margin", "COM!{c}7", f"COM!{TOT_COL}7", "#,##0"),
+      (15, "OPEX (O&M)", "COM!{c}9", f"COM!{TOT_COL}9", "#,##0"),
+      (16, "Depresiasi", "COM!{c}11", f"COM!{TOT_COL}11", "#,##0"),
+      (17, "Tax", "COM!{c}16", f"COM!{TOT_COL}16", "#,##0"),
+      (18, "Net Income", "COM!{c}17", f"COM!{TOT_COL}17", "#,##0"),
       (20, "CAPEX", "COM!{c}31", "COM!C39", "#,##0"),
   ]
   for r_idx, label, cell_tmpl, tot_ref, fmt in pl_rows:
@@ -593,21 +606,27 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
       cell.value = f"={cell_tmpl.format(c=col)}"
       cell.number_format = fmt
       cell.border = THIN
-    cT = ws.cell(row=r_idx, column=8)
+    cT = ws.cell(row=r_idx, column=3 + num_excel_years)
     cT.value = "=-COM!C31" if label == "CAPEX" else f"={tot_ref}"
     cT.number_format = fmt; cT.font = BOLD; cT.border = THIN
 
-  ws["B14"] = "GP Margin"; ws["H14"] = "=COM!H8"; ws["H14"].number_format = "0.00%"
-  ws["B19"] = "NI Margin"; ws["H19"] = "=COM!H18"; ws["H19"].number_format = "0.00%"
+  ws["B14"] = "GP Margin"; ws[f"{TOT_COL}14"] = f"=COM!{TOT_COL}8"; ws[f"{TOT_COL}14"].number_format = "0.00%"
+  ws["B19"] = "NI Margin"; ws[f"{TOT_COL}19"] = f"=COM!{TOT_COL}18"; ws[f"{TOT_COL}19"].number_format = "0.00%"
 
   ws["C23"] = "• NPV ="; ws["D23"] = "=COM!C39"; ws["D23"].number_format = "#,##0"; ws["D23"].font = BOLD
   ws["C24"] = "• MIRR ="; ws["D24"] = "=COM!C41"; ws["D24"].number_format = "0.00%"; ws["D24"].font = BOLD
   ws["C25"] = "• PP ="; ws["D25"] = "=COM!C44"; ws["D25"].number_format = "0.00"; ws["D25"].font = BOLD
 
-  ws["L10"] = f"Simulasi Perhitungan Usulan Capex Delivery {p['nama_proyek']}"
-  ws["L10"].font = BOLD; ws["L10"].fill = PatternFill("solid", fgColor="F2F2F2")
-  ws.merge_cells("L10:M10")
-  ws["L10"].alignment = Alignment(horizontal="center", wrap_text=True)
+  # Dynamic placement for the right summary card (at least column L or 2 columns after TOTAL)
+  right_start_idx = max(12, 3 + num_excel_years + 2)
+  col_L = get_column_letter(right_start_idx)
+  col_M = get_column_letter(right_start_idx + 1)
+  col_N = get_column_letter(right_start_idx + 2)
+
+  ws[f"{col_L}10"] = f"Simulasi Perhitungan Usulan Capex Delivery {_clean_cell_str(p['nama_proyek'])}"
+  ws[f"{col_L}10"].font = BOLD; ws[f"{col_L}10"].fill = PatternFill("solid", fgColor="F2F2F2")
+  ws.merge_cells(f"{col_L}10:{col_M}10")
+  ws[f"{col_L}10"].alignment = Alignment(horizontal="center", wrap_text=True)
 
   right_rows = [
       (12, "Revenue", "=B7", "#,##0", None),
@@ -623,25 +642,26 @@ def build_workbook(p: dict) -> openpyxl.Workbook:
       (22, "Verdict Kelayakan", "=COM!C48", None, None),
   ]
   for r_idx, lbl, formula, fmt, note in right_rows:
-    cL = ws.cell(row=r_idx, column=12, value=lbl); cL.font = BOLD
+    cL = ws.cell(row=r_idx, column=right_start_idx, value=lbl); cL.font = BOLD
     cL.fill = PatternFill("solid", fgColor="F2F2F2"); cL.border = THIN
-    cM = ws.cell(row=r_idx, column=13, value=formula)
+    cM = ws.cell(row=r_idx, column=right_start_idx + 1, value=formula)
     if fmt:
       cM.number_format = fmt
     cM.fill = PatternFill("solid", fgColor="F2F2F2"); cM.border = THIN
     cM.alignment = Alignment(horizontal="right")
     if note:
-      ws.cell(row=r_idx, column=14, value=note)
+      ws.cell(row=r_idx, column=right_start_idx + 2, value=note)
 
-  ws["L24"] = f"WACC yang dipakai: {p['wacc_pct']:.2f}%."
-  ws["L24"].fill = YFILL
-  ws["L25"] = "IRR minimal = WACC + 2%"
-  ws["L25"].fill = YFILL
+  ws[f"{col_L}24"] = f"WACC yang dipakai: {p['wacc_pct']:.2f}%."
+  ws[f"{col_L}24"].fill = YFILL
+  ws[f"{col_L}25"] = "IRR minimal = WACC + 2%"
+  ws[f"{col_L}25"].fill = YFILL
 
-  col_widths = {"A": 4, "B": 20, "C": 15, "D": 15, "E": 15, "F": 15, "G": 15,
-                "H": 16, "L": 26, "M": 20, "N": 16}
+  col_widths = {"A": 4, "B": 20, col_L: 26, col_M: 20, col_N: 16}
   for cl, w in col_widths.items():
     ws.column_dimensions[cl].width = w
+  for cl in YEAR_COLS + [TOT_COL]:
+    ws.column_dimensions[cl].width = 15
 
   return wb
 

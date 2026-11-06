@@ -87,10 +87,13 @@
 
                                             {{-- Marketing (Pengisi / Pengupdate Komersial OTC, MRC) --}}
                                             @if($item->pihakB)
-                                            <span class="inline-flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200" title="Dilengkapi / Diupdate oleh Marketing: {{ $item->pihakB->name }}">
+                                            <span class="inline-flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200" title="Dilengkapi / Diupdate oleh Marketing: {{ $item->pihakB->name }} @if($item->marketing_updated_at) pada {{ $item->marketing_updated_at->translatedFormat('d M Y, H:i') }} WIB ({{ $item->marketing_updated_at->diffForHumans() }}) @endif">
                                                 <i data-lucide="tag" class="w-3 h-3 text-blue-500"></i>
                                                 <span class="text-blue-500 text-[10px] font-semibold">MKT:</span>
                                                 <span class="font-medium">{{ $item->pihakB->name }}</span>
+                                                @if($item->marketing_updated_at)
+                                                <span class="text-blue-600 text-[10px] font-mono ml-0.5" title="Waktu update laporan oleh Marketing">({{ $item->marketing_updated_at->translatedFormat('d/m H:i') }})</span>
+                                                @endif
                                                 @if(auth()->id() === $item->pihakB->id)
                                                 <span class="text-[10px] text-blue-400 font-normal">(Anda)</span>
                                                 @endif

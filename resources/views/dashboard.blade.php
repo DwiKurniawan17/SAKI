@@ -262,10 +262,13 @@
 
                                             {{-- Marketing (Pengisi Komersial) --}}
                                             @if($item->pihakB)
-                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200" title="Dilengkapi / Diupdate oleh Marketing: {{ $item->pihakB->name }}">
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200" title="Dilengkapi / Diupdate oleh Marketing: {{ $item->pihakB->name }} @if($item->marketing_updated_at) pada {{ $item->marketing_updated_at->translatedFormat('d M Y, H:i') }} WIB ({{ $item->marketing_updated_at->diffForHumans() }}) @endif">
                                                 <i data-lucide="tag" class="w-2.5 h-2.5 text-blue-500"></i>
                                                 <span class="text-blue-500 text-[9px] font-bold">MKT:</span>
                                                 {{ $item->pihakB->name }}
+                                                @if($item->marketing_updated_at)
+                                                <span class="text-blue-600 text-[9px] font-mono ml-0.5">({{ $item->marketing_updated_at->translatedFormat('d/m H:i') }})</span>
+                                                @endif
                                                 @if(auth()->id() === $item->pihakB->id)
                                                 <span class="text-[9px] text-blue-400 font-normal">(Anda)</span>
                                                 @endif

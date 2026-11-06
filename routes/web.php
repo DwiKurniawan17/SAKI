@@ -16,7 +16,11 @@ Route::get('/', function () {
 
 // DIHAPUS: Route::get('/logout') — rentan CSRF (siapapun bisa logout user via link)
 // Logout ditangani oleh Laravel Fortify via POST /logout dengan CSRF token.
-// Pastikan semua tombol logout menggunakan form POST (lihat layout.blade.php).
+// ---- Email Verification with OTP Code ----
+Route::middleware(['auth'])->group(function () {
+    Route::post('/email/verify-code', [\App\Http\Controllers\Auth\VerifyEmailCodeController::class, 'verify'])
+        ->name('verification.verify-code');
+});
 
 // ---- Requires: authenticated + approved ----
 Route::middleware(['auth', 'approved'])->group(function () {
@@ -41,8 +45,17 @@ Route::middleware(['auth', 'approved'])->group(function () {
         Route::get('/simulasi/{simulasi}', [SimulasiAkiController::class, 'show'])->name('simulasi.show');
         Route::post('/simulasi/{simulasi}/complete-marketing', [SimulasiAkiController::class, 'completePihakB'])->name('simulasi.completeMarketing');
         Route::get('/simulasi/{simulasi}/download', [SimulasiAkiController::class, 'download'])->name('simulasi.download');
+        Route::get('/simulasi/{simulasi}/download-word', [SimulasiAkiController::class, 'downloadWord'])->name('simulasi.downloadWord');
         Route::delete('/simulasi/{simulasi}', [SimulasiAkiController::class, 'destroy'])->name('simulasi.destroy');
         Route::get('/riwayat', [SimulasiAkiController::class, 'riwayat'])->name('simulasi.riwayat');
+
+        // ---- Studio Simulasi Interaktif (React SPA - Khusus RSO / Admin) ----
+        Route::middleware(['role:admin'])->group(function () {
+            Route::get('/simulasi-studio', [SimulasiAkiController::class, 'studio'])->name('simulasi.studio');
+            Route::get('/simulasi/{simulasi}/studio', [SimulasiAkiController::class, 'studioWithData'])->name('simulasi.studio.edit');
+            Route::post('/api/simulasi/calculate-live', [SimulasiAkiController::class, 'calculateLive'])->name('simulasi.calculateLive');
+            Route::post('/api/simulasi/save-studio', [SimulasiAkiController::class, 'saveStudio'])->name('simulasi.saveStudio');
+        });
 
         // ---- Revisi (user edit setelah direject RSO) ----
         Route::get('/simulasi/{simulasi}/edit', [SimulasiAkiController::class, 'edit'])->name('simulasi.edit');
@@ -54,6 +67,7 @@ Route::middleware(['auth', 'approved'])->group(function () {
             Route::post('/simulasi/{simulasi}/reject', [SimulasiAkiController::class, 'reject'])->name('simulasi.reject');
             Route::post('/simulasi/{simulasi}/recalculate', [SimulasiAkiController::class, 'recalculate'])->name('simulasi.recalculate');
             Route::match(['get', 'post'], '/simulasi/{simulasi}/preview-excel', [SimulasiAkiController::class, 'previewExcel'])->name('simulasi.previewExcel');
+            Route::match(['get', 'post'], '/simulasi/{simulasi}/preview-word', [SimulasiAkiController::class, 'previewWord'])->name('simulasi.previewWord');
         });
 
         // ---- API Price List Lookup (untuk Marketing / Form) ----
@@ -72,7 +86,10 @@ Route::middleware(['auth', 'approved'])->group(function () {
             Route::get('/price-list', [PriceListController::class, 'index'])->name('price-list');
             Route::post('/price-list/import', [PriceListController::class, 'import'])->name('price-list.import');
             Route::post('/price-list/clear', [PriceListController::class, 'clearAll'])->name('price-list.clear');
+            Route::post('/price-list/delete-filtered', [PriceListController::class, 'deleteFiltered'])->name('price-list.delete-filtered');
+            Route::patch('/price-list/{priceList}', [PriceListController::class, 'update'])->name('price-list.update');
             Route::delete('/price-list/{priceList}', [PriceListController::class, 'destroy'])->name('price-list.destroy');
+            Route::post('/parameter/otc', [PriceListController::class, 'updateDefaultOtc'])->name('parameter.update-otc');
         });
     });
 });

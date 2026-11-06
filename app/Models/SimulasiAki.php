@@ -17,6 +17,7 @@ class SimulasiAki extends Model
         'user_id_pihak_a',
         'reviewed_by',
         'reviewed_at',
+        'marketing_updated_at',
         'status',
         'nama_proyek',
         'lokasi',
@@ -39,13 +40,14 @@ class SimulasiAki extends Model
     protected function casts(): array
     {
         return [
-            'input_json'     => 'encrypted:array',
-            'hasil_json'     => 'encrypted:array',
-            'layak'          => 'boolean',
-            'npv'            => 'float',
-            'mirr'           => 'float',
-            'payback_period' => 'float',
-            'reviewed_at'    => 'datetime',
+            'input_json'           => \App\Casts\SafeEncryptedArray::class,
+            'hasil_json'           => \App\Casts\SafeEncryptedArray::class,
+            'layak'                => 'boolean',
+            'npv'                  => 'float',
+            'mirr'                 => 'float',
+            'payback_period'       => 'float',
+            'reviewed_at'          => 'datetime',
+            'marketing_updated_at' => 'datetime',
         ];
     }
 
@@ -87,17 +89,65 @@ class SimulasiAki extends Model
 
     public function getPaketisasiAttribute($value)
     {
-        return $value ?? ($this->input_json['paketisasi'] ?? null);
+        try {
+            return $value ?? ($this->input_json['paketisasi'] ?? null);
+        } catch (\Throwable $e) {
+            return $value;
+        }
     }
 
     public function getBandwidthAttribute($value)
     {
-        return $value ?? ($this->input_json['bandwidth'] ?? null);
+        try {
+            return $value ?? ($this->input_json['bandwidth'] ?? null);
+        } catch (\Throwable $e) {
+            return $value;
+        }
     }
 
     public function getKategoriAttribute($value)
     {
-        return $value ?? ($this->input_json['kategori'] ?? null);
+        try {
+            return $value ?? ($this->input_json['kategori'] ?? null);
+        } catch (\Throwable $e) {
+            return $value;
+        }
+    }
+
+    public function getMrcAttribute($value)
+    {
+        try {
+            return $value ?? ($this->input_json['mrc'] ?? null);
+        } catch (\Throwable $e) {
+            return $value;
+        }
+    }
+
+    public function getOtcAttribute($value)
+    {
+        try {
+            return $value ?? ($this->input_json['otc'] ?? null);
+        } catch (\Throwable $e) {
+            return $value;
+        }
+    }
+
+    public function getMarketingUpdatedAtAttribute($value)
+    {
+        try {
+            if ($value) {
+                return $this->asDateTime($value);
+            }
+            if (!empty($this->input_json['marketing_updated_at'])) {
+                return \Illuminate\Support\Carbon::parse($this->input_json['marketing_updated_at']);
+            }
+            if ($this->user_id_pihak_b && $this->status !== self::STATUS_MENUNGGU_PIHAK_B) {
+                return $this->updated_at;
+            }
+            return null;
+        } catch (\Throwable $e) {
+            return $value ? $this->asDateTime($value) : null;
+        }
     }
 
     public static function ensureColumnsExist(): void
@@ -113,6 +163,9 @@ class SimulasiAki extends Model
                     }
                     if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'bandwidth')) {
                         $table->string('bandwidth')->nullable()->after('paketisasi');
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('simulasi_aki', 'marketing_updated_at')) {
+                        $table->timestamp('marketing_updated_at')->nullable()->after('reviewed_at');
                     }
                 });
             }

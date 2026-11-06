@@ -15,32 +15,55 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('register') }}" x-data="{ role: '{{ old('role', 'engineering_capex') }}' }" class="space-y-4">
+    <form id="form-register" method="POST" action="{{ route('register') }}"
+          x-data="{
+              role: '{{ old('role', 'engineering_capex') }}',
+              setRole(r) {
+                  this.role = r;
+                  const el = document.getElementById('role-input');
+                  if (el) {
+                      el.value = r;
+                      el.dispatchEvent(new Event('input', { bubbles: true }));
+                      el.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+              }
+          }"
+          class="space-y-4">
         @csrf
 
         {{-- Role Selection --}}
         <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Pilih Divisi / Unit Kerja *</label>
-            <input type="hidden" name="role" x-model="role">
+            <input type="hidden" id="role-input" name="role" x-model="role" :value="role" value="{{ old('role', 'engineering_capex') }}">
             <div class="grid grid-cols-2 gap-3">
-                {{-- ED --}}
-                <button type="button" @click="role = 'engineering_capex'"
+                {{-- ED (Engineering Development) --}}
+                <button type="button"
+                        id="btn-role-ed"
+                        @click="setRole('engineering_capex')"
+                        onclick="window.selectRoleFallback('engineering_capex')"
                         :class="role === 'engineering_capex' 
                             ? 'border-2 border-red-600 bg-red-50/50 text-red-900 shadow-sm ring-1 ring-red-600/10' 
                             : 'border border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
-                        class="flex flex-col items-center justify-center p-3 h-20 rounded-xl cursor-pointer text-center transition-all duration-150">
-                    <i data-lucide="cpu" class="w-5 h-5 mb-1.5 transition-colors" :class="role === 'engineering_capex' ? 'text-red-600' : 'text-slate-400'"></i>
+                        class="division-btn flex flex-col items-center justify-center p-2.5 min-h-[5.5rem] rounded-xl cursor-pointer text-center transition-all duration-150 select-none {{ old('role', 'engineering_capex') === 'engineering_capex' ? 'border-2 border-red-600 bg-red-50/50 text-red-900 shadow-sm ring-1 ring-red-600/10' : 'border border-slate-200 bg-white text-slate-600' }}">
+                    <svg class="w-6 h-6 mb-1 shrink-0 transition-colors {{ old('role', 'engineering_capex') === 'engineering_capex' ? 'text-red-600' : 'text-slate-400' }}" :class="role === 'engineering_capex' ? 'text-red-600' : 'text-slate-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
                     <span class="text-xs font-bold block" :class="role === 'engineering_capex' ? 'text-red-900' : 'text-slate-700'">Engineer Development (ED)</span>
                     <span class="text-[10px] text-slate-400">Input Biaya CAPEX</span>
                 </button>
 
-                {{-- Marketing --}}
-                <button type="button" @click="role = 'sales_marketing'"
+                {{-- Marketing (Sales Marketing) --}}
+                <button type="button"
+                        id="btn-role-marketing"
+                        @click="setRole('sales_marketing')"
+                        onclick="window.selectRoleFallback('sales_marketing')"
                         :class="role === 'sales_marketing' 
                             ? 'border-2 border-red-600 bg-red-50/50 text-red-900 shadow-sm ring-1 ring-red-600/10' 
                             : 'border border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
-                        class="flex flex-col items-center justify-center p-3 h-20 rounded-xl cursor-pointer text-center transition-all duration-150">
-                    <i data-lucide="trending-up" class="w-5 h-5 mb-1.5 transition-colors" :class="role === 'sales_marketing' ? 'text-red-600' : 'text-slate-400'"></i>
+                        class="division-btn flex flex-col items-center justify-center p-2.5 min-h-[5.5rem] rounded-xl cursor-pointer text-center transition-all duration-150 select-none {{ old('role') === 'sales_marketing' ? 'border-2 border-red-600 bg-red-50/50 text-red-900 shadow-sm ring-1 ring-red-600/10' : 'border border-slate-200 bg-white text-slate-600' }}">
+                    <svg class="w-6 h-6 mb-1 shrink-0 transition-colors {{ old('role') === 'sales_marketing' ? 'text-red-600' : 'text-slate-400' }}" :class="role === 'sales_marketing' ? 'text-red-600' : 'text-slate-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M11 5.882a3 3 0 00-4.242-2.822L4 3.5v10.5l2.758.44A3 3 0 0011 11.618M11 5.882v5.736m7-2.618a3 3 0 01-3 3M15 12h.01" />
+                    </svg>
                     <span class="text-xs font-bold block" :class="role === 'sales_marketing' ? 'text-red-900' : 'text-slate-700'">Sales Marketing</span>
                     <span class="text-[10px] text-slate-400">Parameter Komersial</span>
                 </button>
@@ -99,7 +122,13 @@
                 <button type="button" @click="showPwd = !showPwd"
                         class="absolute right-0 top-0 h-10 px-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
                         :title="showPwd ? 'Sembunyikan' : 'Tampilkan'">
-                    <i :data-lucide="showPwd ? 'eye-off' : 'eye'" class="w-4 h-4"></i>
+                    <svg x-show="!showPwd" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <svg x-show="showPwd" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" style="display: none;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
                 </button>
             </div>
         </div>
@@ -117,7 +146,13 @@
                 <button type="button" @click="showPwdConf = !showPwdConf"
                         class="absolute right-0 top-0 h-10 px-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
                         :title="showPwdConf ? 'Sembunyikan' : 'Tampilkan'">
-                    <i :data-lucide="showPwdConf ? 'eye-off' : 'eye'" class="w-4 h-4"></i>
+                    <svg x-show="!showPwdConf" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <svg x-show="showPwdConf" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" style="display: none;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
                 </button>
             </div>
         </div>
@@ -128,6 +163,41 @@
             Daftarkan Akun
         </button>
     </form>
+
+    <script>
+        window.selectRoleFallback = function(roleName) {
+            const input = document.getElementById('role-input');
+            if (input) {
+                input.value = roleName;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            const form = document.getElementById('form-register');
+            if (form && window.Alpine) {
+                try {
+                    const data = window.Alpine.$data(form);
+                    if (data) data.role = roleName;
+                } catch (e) {}
+            }
+            const btnEd = document.getElementById('btn-role-ed');
+            const btnMkt = document.getElementById('btn-role-marketing');
+            const isEd = roleName === 'engineering_capex';
+            if (btnEd) {
+                btnEd.className = isEd
+                    ? 'division-btn flex flex-col items-center justify-center p-2.5 min-h-[5.5rem] rounded-xl cursor-pointer text-center transition-all duration-150 select-none border-2 border-red-600 bg-red-50/50 text-red-900 shadow-sm ring-1 ring-red-600/10'
+                    : 'division-btn flex flex-col items-center justify-center p-2.5 min-h-[5.5rem] rounded-xl cursor-pointer text-center transition-all duration-150 select-none border border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50';
+                const iconEd = btnEd.querySelector('svg');
+                if (iconEd) iconEd.setAttribute('class', isEd ? 'w-6 h-6 mb-1 shrink-0 transition-colors text-red-600' : 'w-6 h-6 mb-1 shrink-0 transition-colors text-slate-400');
+            }
+            if (btnMkt) {
+                btnMkt.className = !isEd
+                    ? 'division-btn flex flex-col items-center justify-center p-2.5 min-h-[5.5rem] rounded-xl cursor-pointer text-center transition-all duration-150 select-none border-2 border-red-600 bg-red-50/50 text-red-900 shadow-sm ring-1 ring-red-600/10'
+                    : 'division-btn flex flex-col items-center justify-center p-2.5 min-h-[5.5rem] rounded-xl cursor-pointer text-center transition-all duration-150 select-none border border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50';
+                const iconMkt = btnMkt.querySelector('svg');
+                if (iconMkt) iconMkt.setAttribute('class', !isEd ? 'w-6 h-6 mb-1 shrink-0 transition-colors text-red-600' : 'w-6 h-6 mb-1 shrink-0 transition-colors text-slate-400');
+            }
+        };
+    </script>
 
     <div class="mt-6 pt-5 border-t border-slate-100 text-center">
         <p class="text-xs text-slate-500">

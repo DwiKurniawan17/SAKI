@@ -13,6 +13,7 @@
             <p class="text-sm text-slate-500 mt-1">Input data proyek, lokasi, dan estimasi biaya material serta jasa, atau impor file Excel multi-lokasi.</p>
         </div>
 
+
         {{-- Pending Alert Banner (simulasi milik ED yang menunggu Marketing) --}}
         @if(isset($pendingSimulasi) && count($pendingSimulasi) > 0)
         <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-4 text-sm space-y-3">
@@ -123,7 +124,11 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Biaya Material (Rp) <span class="text-red-500">*</span></label>
-                            <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'material')" x-on:focus="selectAll($event)" x-on:blur="handleBlur($event, 'material')"
+                            <input type="text" inputmode="numeric" name="material_display" data-currency="true"
+                                   x-on:input="handleCurrency($event, 'material')"
+                                   x-on:focus="selectAll($event)"
+                                   x-on:blur="handleBlur($event, 'material')"
+                                   x-on:change.stop
                                    x-bind:value="display.material" required placeholder="0"
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             <input type="hidden" name="material" x-bind:value="raw.material">
@@ -131,7 +136,11 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Biaya Jasa (Rp) <span class="text-red-500">*</span></label>
-                            <input type="text" inputmode="numeric" x-on:input="handleCurrency($event, 'jasa')" x-on:focus="selectAll($event)" x-on:blur="handleBlur($event, 'jasa')"
+                            <input type="text" inputmode="numeric" name="jasa_display" data-currency="true"
+                                   x-on:input="handleCurrency($event, 'jasa')"
+                                   x-on:focus="selectAll($event)"
+                                   x-on:blur="handleBlur($event, 'jasa')"
+                                   x-on:change.stop
                                    x-bind:value="display.jasa" required placeholder="0"
                                    class="w-full h-10 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-900 text-right focus:border-red-600 focus:ring-1 focus:ring-red-600 outline-none transition">
                             <input type="hidden" name="jasa" x-bind:value="raw.jasa">

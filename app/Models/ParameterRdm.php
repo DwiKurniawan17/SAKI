@@ -18,6 +18,7 @@ class ParameterRdm extends Model
         'om_pct',
         'tax_pct',
         'wacc_pct',
+        'default_otc',
         'updated_by',
     ];
 
@@ -31,6 +32,7 @@ class ParameterRdm extends Model
             'om_pct'      => 'float',
             'tax_pct'     => 'float',
             'wacc_pct'    => 'float',
+            'default_otc' => 'float',
         ];
     }
 
@@ -50,12 +52,13 @@ class ParameterRdm extends Model
         if (!$record) {
             $record = static::create([
                 'rdm_otc_pct' => 25.00,
-                'rdm_mrc_pct' => 30.00,
-                'bop_pct'     => 40.00,
+                'rdm_mrc_pct' => 30.00, // Target Margin Bulanan RDM = 30%
+                'bop_pct'     => 0.40,
                 'lifetime'    => 4,
                 'om_pct'      => 12.00,
                 'tax_pct'     => 22.00,
                 'wacc_pct'    => 10.90,
+                'default_otc' => 2500000.00,
             ]);
         }
 
@@ -63,12 +66,12 @@ class ParameterRdm extends Model
     }
 
     /**
-     * Pastikan kolom bop_pct, lifetime, om_pct, tax_pct, wacc_pct tersedia di database
+     * Pastikan kolom bop_pct, lifetime, om_pct, tax_pct, wacc_pct, default_otc tersedia di database
      */
     public static function ensureColumnsExist(): void
     {
         try {
-            if (Schema::hasTable('parameter_rdm') && !Schema::hasColumn('parameter_rdm', 'bop_pct')) {
+            if (Schema::hasTable('parameter_rdm')) {
                 Schema::table('parameter_rdm', function (Blueprint $table) {
                     if (!Schema::hasColumn('parameter_rdm', 'bop_pct')) {
                         $table->decimal('bop_pct', 5, 2)->default(40.00)->nullable();
@@ -85,11 +88,19 @@ class ParameterRdm extends Model
                     if (!Schema::hasColumn('parameter_rdm', 'wacc_pct')) {
                         $table->decimal('wacc_pct', 5, 2)->default(10.90)->nullable();
                     }
+                    if (!Schema::hasColumn('parameter_rdm', 'default_otc')) {
+                        $table->decimal('default_otc', 15, 2)->default(2500000.00)->nullable();
+                    }
                 });
             }
         } catch (\Throwable $e) {
             // Abaikan jika sudah ada atau dalam migrasi
         }
+    }
+
+    public function getDefaultOtcAttribute($value)
+    {
+        return $value !== null && (float) $value > 0 ? (float) $value : 2500000.00;
     }
 
     public function getBopPctAttribute($value)
